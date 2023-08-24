@@ -1,10 +1,11 @@
-package validate_go
+package validate
 
 import (
 	"context"
 	"errors"
 
 	"connectrpc.com/connect"
+
 	"github.com/bufbuild/protovalidate-go"
 	"google.golang.org/protobuf/proto"
 )
@@ -62,6 +63,7 @@ func (i *Interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) co
 	}
 }
 
+// streamingClientInterceptor implements connect.StreamingClientConn.
 type streamingClientInterceptor struct {
 	validator *protovalidate.Validator
 	connect.StreamingClientConn
@@ -72,6 +74,7 @@ func (s *streamingClientInterceptor) Receive(msg any) error {
 	return validate(s.validator, msg)
 }
 
+// streamingHandlerInterceptor implements connect.StreamingHandlerConn.
 type streamingHandlerInterceptor struct {
 	validator *protovalidate.Validator
 	connect.StreamingHandlerConn
@@ -88,7 +91,7 @@ func validate(validator *protovalidate.Validator, msg any) error {
 		return errors.New("unsupported message type")
 	}
 	if err := validator.Validate(message); err != nil {
-		return connect.NewError(connect.CodeInvalidArgument, err)
+		return err
 	}
 	return nil
 }
