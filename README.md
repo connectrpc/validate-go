@@ -29,7 +29,10 @@ To create a new `Interceptor`, you can use the `NewInterceptor` function
 provided by the package:
 
 ```go
-validator := protovalidate.NewValidator() // Initialize your protovalidate validator
+validator, err := protovalidate.New() // Initialize your protovalidate validator
+if err != nil {
+    // Handle error
+}
 interceptor := validate.NewInterceptor(validator)
 ```
 
@@ -40,7 +43,7 @@ the `WrapUnary` method. This ensures that the incoming request is validated
 before being processed:
 
 ```go
-unaryFunc := func (ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+unaryFunc := func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 // Your unary function logic
 }
 
@@ -53,7 +56,7 @@ For streaming clients, you can wrap a `connect.StreamingClientFunc` with the
 interceptor's validation using the `WrapStreamingClient` method:
 
 ```go
-streamingClientFunc := func (ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
+streamingClientFunc := func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
 // Your streaming client logic
 }
 
@@ -67,7 +70,7 @@ a `connect.StreamingHandlerFunc` with the interceptor's validation using
 the `WrapStreamingHandler` method:
 
 ```go
-streamingHandlerFunc := func (ctx context.Context, conn connect.StreamingHandlerConn) error {
+streamingHandlerFunc := func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 // Your streaming handler logic
 }
 
