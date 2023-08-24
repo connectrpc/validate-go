@@ -61,7 +61,6 @@ func (i *Interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) co
 	}
 }
 
-// streamingClientInterceptor implements connect.StreamingClientConn.
 type streamingClientInterceptor struct {
 	connect.StreamingClientConn
 	validator *protovalidate.Validator
@@ -71,7 +70,6 @@ func (s *streamingClientInterceptor) Send(msg any) error {
 	return validate(s.validator, msg)
 }
 
-// streamingHandlerInterceptor implements connect.StreamingHandlerConn.
 type streamingHandlerInterceptor struct {
 	connect.StreamingHandlerConn
 	validator *protovalidate.Validator
