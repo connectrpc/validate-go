@@ -1,14 +1,29 @@
+// Copyright 2023 Buf Technologies, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package validate
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	"connectrpc.com/connect"
-
 	"github.com/bufbuild/protovalidate-go"
 	"google.golang.org/protobuf/proto"
 )
+
+var _ connect.Interceptor = &Interceptor{}
 
 // Option interface is currently empty and serves as a placeholder for potential future implementations.
 // It allows adding new options without breaking existing code.
@@ -67,7 +82,10 @@ type streamingClientInterceptor struct {
 }
 
 func (s *streamingClientInterceptor) Send(msg any) error {
-	return validate(s.validator, msg)
+	if err := validate(s.validator, msg); err != nil {
+		return err
+	}
+	return s.StreamingClientConn.Send(msg)
 }
 
 type streamingHandlerInterceptor struct {
@@ -76,16 +94,22 @@ type streamingHandlerInterceptor struct {
 }
 
 func (s *streamingHandlerInterceptor) Receive(msg any) error {
-	return validate(s.validator, msg)
+	if err := validate(s.validator, msg); err != nil {
+		return err
+	}
+	return s.StreamingHandlerConn.Receive(msg)
 }
 
 func validate(validator *protovalidate.Validator, msg any) error {
-	message, ok := msg.(proto.Message)
-	if !ok {
-		return errors.New("unsupported message type")
-	}
-	if err := validator.Validate(message); err != nil {
-		return err
+	switch m := msg.(type) {
+	case connect.AnyRequest:
+		return validate(validator, m.Any())
+	case proto.Message:
+		if err := validator.Validate(m); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unsupported message type")
 	}
 	return nil
 }
