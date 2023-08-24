@@ -19,6 +19,7 @@ package validate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"connectrpc.com/connect"
@@ -34,12 +35,15 @@ type Option interface {
 	unimplemented()
 }
 
-// Interceptor implements the connect.Interceptor interface.
+// Interceptor implements the connect.Interceptor interface, providing message validation
+// for the ConnectRPC framework. It integrates with the protovalidate-go library to ensure
+// incoming protocol buffer messages adhere to the defined message structure.
 type Interceptor struct {
 	validator *protovalidate.Validator
 }
 
-// NewInterceptor returns a new Interceptor.
+// NewInterceptor returns a new instance of the Interceptor.
+// It accepts a protovalidate.Validator as a parameter to perform message validation.
 func NewInterceptor(
 	validator *protovalidate.Validator,
 	_ ...Option,
@@ -49,8 +53,7 @@ func NewInterceptor(
 	}
 }
 
-// WrapUnary returns a new connect.UnaryFunc that wraps the given connect.UnaryFunc.
-// It ensures that incoming requests are validated before being processed.
+// WrapUnary implements the connect.Interceptor interface.
 func (i *Interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		if err := validate(i.validator, req.Any()); err != nil {
@@ -60,8 +63,7 @@ func (i *Interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	}
 }
 
-// WrapStreamingClient returns a new connect.StreamingClientFunc that wraps the given connect.StreamingClientFunc.
-// It ensures that messages sent by the client are validated before transmission.
+// WrapStreamingClient implements the connect.Interceptor interface.
 func (i *Interceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
 	return func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
 		return &streamingClientInterceptor{
@@ -71,8 +73,7 @@ func (i *Interceptor) WrapStreamingClient(next connect.StreamingClientFunc) conn
 	}
 }
 
-// WrapStreamingHandler returns a new connect.StreamingHandlerFunc that wraps the given connect.StreamingHandlerFunc.
-// It ensures that messages received by the handler are validated before processing.
+// WrapStreamingHandler implements the connect.Interceptor interface.
 func (i *Interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		return next(ctx, &streamingHandlerInterceptor{
@@ -112,10 +113,17 @@ func validate(validator *protovalidate.Validator, msg any) error {
 		return validate(validator, m.Any())
 	case proto.Message:
 		if err := validator.Validate(m); err != nil {
-			return err
+			out := connect.NewError(connect.CodeInvalidArgument, err)
+			var e *protovalidate.ValidationError
+			if errors.As(err, &e) {
+				if detail, err := connect.NewErrorDetail(e.ToProto()); err == nil {
+					out.AddDetail(detail)
+				}
+			}
+			return out
 		}
 	default:
-		return fmt.Errorf("unsupported message type")
+		return fmt.Errorf("unsupported message type %T", m)
 	}
 	return nil
 }
