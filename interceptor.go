@@ -19,17 +19,15 @@ type Option interface {
 // Interceptor implements connect.Interceptor.
 type Interceptor struct {
 	validator *protovalidate.Validator
-	options   []Option
 }
 
 // NewInterceptor returns a new Interceptor.
 func NewInterceptor(
 	validator *protovalidate.Validator,
-	opts ...Option,
+	_ ...Option,
 ) *Interceptor {
 	return &Interceptor{
 		validator: validator,
-		options:   opts,
 	}
 }
 
@@ -65,22 +63,20 @@ func (i *Interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) co
 
 // streamingClientInterceptor implements connect.StreamingClientConn.
 type streamingClientInterceptor struct {
-	validator *protovalidate.Validator
 	connect.StreamingClientConn
+	validator *protovalidate.Validator
 }
 
-// Receive implements connect.StreamingClientConn.
-func (s *streamingClientInterceptor) Receive(msg any) error {
+func (s *streamingClientInterceptor) Send(msg any) error {
 	return validate(s.validator, msg)
 }
 
 // streamingHandlerInterceptor implements connect.StreamingHandlerConn.
 type streamingHandlerInterceptor struct {
-	validator *protovalidate.Validator
 	connect.StreamingHandlerConn
+	validator *protovalidate.Validator
 }
 
-// Receive implements connect.StreamingHandlerConn.
 func (s *streamingHandlerInterceptor) Receive(msg any) error {
 	return validate(s.validator, msg)
 }
