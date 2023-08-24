@@ -72,10 +72,6 @@ type mockStreamingClientConn struct {
 	connect.StreamingClientConn
 }
 
-func newMockStreamingClientConn() *mockStreamingClientConn {
-	return &mockStreamingClientConn{}
-}
-
 func (m *mockStreamingClientConn) Send(_ any) error {
 	return nil
 }
@@ -107,7 +103,7 @@ func TestStreamingClientInterceptor_Send(t *testing.T) {
 
 			clientConn := streamingClientInterceptor{
 				validator:           validator,
-				StreamingClientConn: newMockStreamingClientConn(),
+				StreamingClientConn: &mockStreamingClientConn{},
 			}
 			err = clientConn.Send(connect.NewRequest(test.message))
 			if test.wantErr {
@@ -123,10 +119,6 @@ var _ connect.StreamingHandlerConn = &mockStreamingHandlerConn{}
 
 type mockStreamingHandlerConn struct {
 	connect.StreamingHandlerConn
-}
-
-func newMockStreamingHandlerConn() *mockStreamingHandlerConn {
-	return &mockStreamingHandlerConn{}
 }
 
 func (m *mockStreamingHandlerConn) Receive(_ any) error {
@@ -159,7 +151,7 @@ func TestStreamingHandlerInterceptor_Receive(t *testing.T) {
 			require.NoError(t, err)
 			handlerConn := &streamingHandlerInterceptor{
 				validator:            validator,
-				StreamingHandlerConn: newMockStreamingHandlerConn(),
+				StreamingHandlerConn: &mockStreamingHandlerConn{},
 			}
 			err = handlerConn.Receive(connect.NewRequest(test.message))
 			if test.wantErr {
