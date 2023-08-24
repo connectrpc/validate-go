@@ -79,5 +79,4 @@ wrappedStreamingHandlerFunc := interceptor.WrapStreamingHandler(streamingHandler
 
 ## License
 
-This package is distributed under the [MIT License](LICENSE).
-
+Offered under the [Apache 2 license](LICENSE).
