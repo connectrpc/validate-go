@@ -108,22 +108,22 @@ func (s *streamingHandlerInterceptor) Receive(msg any) error {
 }
 
 func validate(validator *protovalidate.Validator, msg any) error {
-	switch m := msg.(type) {
+	switch protoMessage := msg.(type) {
 	case connect.AnyRequest:
-		return validate(validator, m.Any())
+		return validate(validator, protoMessage.Any())
 	case proto.Message:
-		if err := validator.Validate(m); err != nil {
+		if err := validator.Validate(protoMessage); err != nil {
 			out := connect.NewError(connect.CodeInvalidArgument, err)
-			var e *protovalidate.ValidationError
-			if errors.As(err, &e) {
-				if detail, err := connect.NewErrorDetail(e.ToProto()); err == nil {
+			var validationErr *protovalidate.ValidationError
+			if errors.As(err, &validationErr) {
+				if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
 					out.AddDetail(detail)
 				}
 			}
 			return out
 		}
 	default:
-		return fmt.Errorf("unsupported message type %T", m)
+		return fmt.Errorf("unsupported message type %T", protoMessage)
 	}
 	return nil
 }
