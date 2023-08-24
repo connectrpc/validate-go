@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package validate provides an interceptor implementation for the ConnectRPC framework.
+// The interceptor integrates with the protovalidate-go library to validate incoming protobuf messages,
+// ensuring adherence to the defined message structure.
 package validate
 
 import (
