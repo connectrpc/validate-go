@@ -81,6 +81,14 @@ streamingHandlerFunc := func(ctx context.Context, conn connect.StreamingHandlerC
 wrappedStreamingHandlerFunc := interceptor.WrapStreamingHandler(streamingHandlerFunc)
 ```
 
+## Ecosystem
+
+- [connect-go]: The ConnectRPC framework for Go.
+- [protovalidate-go]: A protocol buffer message validator for Go.
+
 ## License
 
 Offered under the [Apache 2 license](LICENSE).
+
+[connect-go]: https://github.com/connectrpc/connect-go
+[protovalidate-go]: https://github.com/bufbuild/protovalidate-go
