@@ -29,12 +29,6 @@ import (
 
 var _ connect.Interceptor = &Interceptor{}
 
-// Option interface is currently empty and serves as a placeholder for potential future implementations.
-// It allows adding new options without breaking existing code.
-type Option interface {
-	unimplemented()
-}
-
 // Interceptor implements the connect.Interceptor interface, providing message validation
 // for the ConnectRPC framework. It integrates with the protovalidate-go library to ensure
 // incoming protocol buffer messages adhere to the defined message structure.
@@ -42,14 +36,32 @@ type Interceptor struct {
 	validator *protovalidate.Validator
 }
 
+// Option is a functional option for the Interceptor.
+type Option func(*Interceptor)
+
 // NewInterceptor returns a new instance of the Interceptor.
 // It accepts a protovalidate.Validator as a parameter to perform message validation.
-func NewInterceptor(
-	validator *protovalidate.Validator,
-	_ ...Option,
-) *Interceptor {
-	return &Interceptor{
-		validator: validator,
+func NewInterceptor(opts ...Option) (*Interceptor, error) {
+	out := &Interceptor{}
+	for _, apply := range opts {
+		apply(out)
+	}
+
+	if out.validator == nil {
+		validator, err := protovalidate.New()
+		if err != nil {
+			return nil, err
+		}
+		out.validator = validator
+	}
+
+	return out, nil
+}
+
+// WithInterceptor sets the validator to use for message validation.
+func WithInterceptor(validator *protovalidate.Validator) Option {
+	return func(i *Interceptor) {
+		i.validator = validator
 	}
 }
 
