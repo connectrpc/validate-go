@@ -40,47 +40,6 @@ if err != nil {
 interceptor := validate.NewInterceptor(validator)
 ```
 
-### Wrapping Unary Functions
-
-You can wrap a `connect.UnaryFunc` with the interceptor's validation using
-the `WrapUnary` method. This ensures that the incoming request is validated
-before being processed:
-
-```go
-unaryFunc := func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-// Your unary function logic
-}
-
-wrappedUnaryFunc := interceptor.WrapUnary(unaryFunc)
-```
-
-### Wrapping Streaming Clients
-
-For streaming clients, you can wrap a `connect.StreamingClientFunc` with the
-interceptor's validation using the `WrapStreamingClient` method:
-
-```go
-streamingClientFunc := func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
-// Your streaming client logic
-}
-
-wrappedStreamingClientFunc := interceptor.WrapStreamingClient(streamingClientFunc)
-```
-
-### Wrapping Streaming Handlers
-
-When dealing with streaming handlers, you can wrap
-a `connect.StreamingHandlerFunc` with the interceptor's validation using
-the `WrapStreamingHandler` method:
-
-```go
-streamingHandlerFunc := func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-// Your streaming handler logic
-}
-
-wrappedStreamingHandlerFunc := interceptor.WrapStreamingHandler(streamingHandlerFunc)
-```
-
 ## Ecosystem
 
 - [connect-go]: The ConnectRPC framework for Go.

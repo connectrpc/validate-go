@@ -51,14 +51,3 @@ issues:
     # Don't ban use of fmt.Errorf to create new errors, but the remaining
     # checks from err113 are useful.
     - "err113: do not define dynamic errors.*"
-    # suppress missing field linting errors in test mocks.
-    # Mocks may not require all fields during specific test scenarios.
-  exclude-rules:
-    - path: interceptor_test.go
-      linters:
-        - exhaustruct
-    # error about missing 'validator' field in the Interceptor struct.
-    # The 'validator' field is not be needed in this particular context.
-    - path: interceptor.go
-      linters:
-        - exhaustruct

@@ -18,16 +18,15 @@
 package validate
 
 import (
+	"connectrpc.com/connect"
 	"context"
 	"errors"
 	"fmt"
-
-	"connectrpc.com/connect"
 	"github.com/bufbuild/protovalidate-go"
 	"google.golang.org/protobuf/proto"
 )
 
-var _ connect.Interceptor = &Interceptor{}
+var _ connect.Interceptor = (*Interceptor)(nil)
 
 // Interceptor implements the connect.Interceptor interface, providing message validation
 // for the ConnectRPC framework. It integrates with the protovalidate-go library to ensure
@@ -122,22 +121,19 @@ func (s *streamingHandlerInterceptor) Receive(msg any) error {
 }
 
 func validate(validator *protovalidate.Validator, msg any) error {
-	switch protoMessage := msg.(type) {
-	case connect.AnyRequest:
-		return validate(validator, protoMessage.Any())
-	case proto.Message:
-		if err := validator.Validate(protoMessage); err != nil {
-			out := connect.NewError(connect.CodeInvalidArgument, err)
-			var validationErr *protovalidate.ValidationError
-			if errors.As(err, &validationErr) {
-				if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
-					out.AddDetail(detail)
-				}
+	protoMessage, ok := msg.(proto.Message)
+	if !ok {
+		return fmt.Errorf("message is not a proto.Message: %T", msg)
+	}
+	if err := validator.Validate(protoMessage); err != nil {
+		out := connect.NewError(connect.CodeInvalidArgument, err)
+		var validationErr *protovalidate.ValidationError
+		if errors.As(err, &validationErr) {
+			if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
+				out.AddDetail(detail)
 			}
-			return out
 		}
-	default:
-		return fmt.Errorf("unsupported message type %T", protoMessage)
+		return out
 	}
 	return nil
 }
