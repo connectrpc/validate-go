@@ -1,44 +1,76 @@
-# ConnectRPC Validate Go
+# ConnectRPC Validation Interceptor
 
 [![Build](https://github.com/connectrpc/validate-go/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/connectrpc/validate-go/actions/workflows/ci.yaml)
 [![Report Card](https://goreportcard.com/badge/connectrpc.com/validate)](https://goreportcard.com/report/connectrpc.com/validate)
 [![GoDoc](https://pkg.go.dev/badge/connectrpc.com/validate.svg)](https://pkg.go.dev/connectrpc.com/validate)
 
-This repository contains a Go package named `validate` that provides an
-interceptor implementation for the ConnectRPC framework. The interceptor is
-designed to perform protocol buffer message validation using
-the `protovalidate-go` library. The provided interceptor can be used to ensure
-that incoming requests and messages adhere to the defined protocol buffer
-message structure.
+The `validate` package provides an interceptor implementation for the ConnectRPC
+framework.
+It integrates with the [`protovalidate-go`][protovalidate-go] library to
+validate incoming protobuf messages,
+ensuring adherence to the defined message structure. This interceptor is a
+crucial layer
+in the communication pipeline, enhancing data integrity and reliability within
+the ConnectRPC framework.
 
 ## Installation
 
-To use the `validate` package in your Go project, you can add it as a dependency
-using `go get`:
+To use the `validate` package, you need to have Go installed. You can then
+install the package using:
 
-```bash
-go get connectrpc.com/validate
+```sh
+go get -u connectrpc.com/validate
 ```
 
 ## Usage
 
-The `validate` package offers an interceptor named `Interceptor` that implements
-the `connect.Interceptor` interface. This interceptor is used to validate
-incoming messages using the `protovalidate-go` library before passing them on to
-the next interceptor or handler.
+To use the `Interceptor`, follow these steps:
 
-### Creating an Interceptor
+1. Import the necessary packages:
 
-To create a new `Interceptor`, you can use the `NewInterceptor` function
-provided by the package:
+    ```go
+    import (
+        "context"
+        
+        "connectrpc.com/connect"
+        "connectrpc.com/validate"
+    )
+    ```
 
-```go
-validator, err := protovalidate.New() // Initialize your protovalidate validator
-if err != nil {
-    // Handle error
-}
-interceptor := validate.NewInterceptor(validator)
-```
+2. Create a custom validator if needed (optional):
+
+    ```go
+    validator := protovalidate.New() // Customize the validator as needed
+    ```
+
+    > See [`protovalidate`][protovalidate] for more information on how to construct
+    > a validator.
+
+3. Create an instance of the `Interceptor` using `NewInterceptor`:
+
+    ```go
+    interceptor, err := validate.NewInterceptor(validate.WithInterceptor(validator))
+    if err != nil {
+        // Handle error
+    }
+    ```
+
+    > If you do not provide a custom validator, the interceptor will create and use
+    > a default validator.
+
+4. Apply the interceptor to your ConnectRPC server's handlers:
+
+    ```go
+    path, handler := examplev1connect.NewExampleServiceHandler(
+        server,
+        connect.WithInterceptors(interceptor),
+    )
+    ```
+
+By applying the interceptor to your server's handlers, you ensure that incoming
+requests are thoroughly validated before being processed. This practice
+minimizes the risk of handling invalid or unexpected data, contributing to more
+robust and reliable data processing logic.
 
 ## Ecosystem
 
@@ -51,3 +83,4 @@ Offered under the [Apache 2 license](LICENSE).
 
 [connect-go]: https://github.com/connectrpc/connect-go
 [protovalidate-go]: https://github.com/bufbuild/protovalidate-go
+[protovalidate]: https://github.com/bufbuild/protovalidate
