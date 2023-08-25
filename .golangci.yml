@@ -13,7 +13,7 @@ linters-settings:
   godox:
     # TODO, OPT, etc. comments are fine to commit. Use FIXME comments for
     # temporary hacks, and use godox to prevent committing them.
-    keywords: [FIXME]
+    keywords: [ FIXME ]
   varnamelen:
     ignore-decls:
       - T any
@@ -51,10 +51,11 @@ issues:
     # Don't ban use of fmt.Errorf to create new errors, but the remaining
     # checks from err113 are useful.
     - "err113: do not define dynamic errors.*"
-#  exclude-rules:
-#    - path: interceptor_test.go
-#      linters:
-#        - exhaustruct
-#    - path: interceptor.go
-#      linters:
-#        - exhaustruct
+  exclude-rules:
+    - path: interceptor_test.go
+      linters:
+        - gochecknoglobals
+        - exhaustruct
+    - path: interceptor.go
+      linters:
+        - exhaustruct
