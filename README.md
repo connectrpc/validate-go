@@ -1,5 +1,9 @@
 # ConnectRPC Validate Go
 
+[![Build](https://github.com/connectrpc/validate-go/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/connectrpc/validate-go/actions/workflows/ci.yaml)
+[![Report Card](https://goreportcard.com/badge/connectrpc.com/validate)](https://goreportcard.com/report/connectrpc.com/validate)
+[![GoDoc](https://pkg.go.dev/badge/connectrpc.com/validate.svg)](https://pkg.go.dev/connectrpc.com/validate)
+
 This repository contains a Go package named `validate` that provides an
 interceptor implementation for the ConnectRPC framework. The interceptor is
 designed to perform protocol buffer message validation using
