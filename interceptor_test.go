@@ -17,8 +17,9 @@ package validate
 import (
 	"context"
 	"fmt"
-	"github.com/bufbuild/protovalidate-go"
 	"testing"
+
+	"github.com/bufbuild/protovalidate-go"
 
 	"buf.build/gen/go/bufbuild/protovalidate-testing/protocolbuffers/go/buf/validate/conformance/cases"
 	"connectrpc.com/connect"
@@ -45,7 +46,7 @@ func TestNewInterceptor(t *testing.T) {
 
 func TestInterceptor_WrapUnary(t *testing.T) {
 	t.Parallel()
-	var tests = []struct {
+	tests := []struct {
 		name    string
 		message *cases.StringConst
 		wantErr bool

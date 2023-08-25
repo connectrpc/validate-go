@@ -18,10 +18,12 @@
 package validate
 
 import (
-	"connectrpc.com/connect"
 	"context"
 	"errors"
 	"fmt"
+
+	"connectrpc.com/connect"
+
 	"github.com/bufbuild/protovalidate-go"
 	"google.golang.org/protobuf/proto"
 )
