@@ -39,7 +39,7 @@ To use the `Interceptor`, follow these steps:
     validator := protovalidate.New() // Customize the validator as needed
     ```
 
-   > See [`protovalidate`][protovalidate] for more information on how to
+   > See [`protovalidate-go`][protovalidate-go] for more information on how to
    construct
    > a validator.
 
@@ -81,4 +81,3 @@ Offered under the [Apache 2 license](LICENSE).
 
 [connect-go]: https://github.com/connectrpc/connect-go
 [protovalidate-go]: https://github.com/bufbuild/protovalidate-go
-[protovalidate]: https://github.com/bufbuild/protovalidate
