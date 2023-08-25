@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package validate provides an interceptor implementation for the ConnectRPC framework.
-// The interceptor integrates with the protovalidate-go library to validate incoming protobuf messages,
-// ensuring adherence to the defined message structure.
+// Package validate provides an interceptor implementation for the ConnectRPC framework
+// that integrates with the protovalidate-go library to validate incoming protobuf messages.
+// This interceptor ensures adherence to the defined message structure and can be used
+// to enhance the reliability of data communication within the ConnectRPC framework.
 package validate
 
 import (
@@ -28,11 +29,21 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var _ connect.Interceptor = (*Interceptor)(nil)
-
-// Interceptor implements the connect.Interceptor interface, providing message validation
-// for the ConnectRPC framework. It integrates with the protovalidate-go library to ensure
-// incoming protocol buffer messages adhere to the defined message structure.
+// Interceptor implements the connect.Interceptor interface and serves as a crucial
+// layer in the communication pipeline, by validating incoming requests and ensuring
+// they conform to defined protovalidate preconditions.
+//
+// Default Behaviors:
+//   - Requests are validated for adherence to the defined message structure.
+//   - Responses are not validated, focusing validation efforts on incoming data.
+//   - Errors are raised for incoming messages that are not protocol buffer messages.
+//   - In case of validation errors, an error detail of the type is attached to provide
+//     additional context about the validation failure.
+//
+// It's recommended to use the Interceptor primarily with server-side handlers rather than
+// client connections. Placing the Interceptor on handlers ensures that incoming requests
+// are thoroughly validated before they are processed, minimizing the risk of handling
+// invalid or unexpected data.
 type Interceptor struct {
 	validator *protovalidate.Validator
 }
@@ -40,8 +51,21 @@ type Interceptor struct {
 // Option is a functional option for the Interceptor.
 type Option func(*Interceptor)
 
-// NewInterceptor returns a new instance of the Interceptor.
-// It accepts a protovalidate.Validator as a parameter to perform message validation.
+// NewInterceptor returns a new instance of the Interceptor. It accepts an optional functional
+// option to customize its behavior. If no custom validator is provided, a default validator
+// is used for message validation.
+//
+// Usage:
+//
+//	interceptor, err := NewInterceptor(WithInterceptor(customValidator))
+//	if err != nil {
+//	  // Handle error
+//	}
+//
+//	path, handler := examplev1connect.NewExampleServiceHandler(
+//		server,
+//		connect.WithInterceptors(interceptor),
+//	)
 func NewInterceptor(opts ...Option) (*Interceptor, error) {
 	out := &Interceptor{}
 	for _, apply := range opts {
@@ -59,7 +83,8 @@ func NewInterceptor(opts ...Option) (*Interceptor, error) {
 	return out, nil
 }
 
-// WithInterceptor sets the validator to use for message validation.
+// WithInterceptor sets the validator to be used for message validation.
+// This option allows customization of the validator used by the Interceptor.
 func WithInterceptor(validator *protovalidate.Validator) Option {
 	return func(i *Interceptor) {
 		i.validator = validator

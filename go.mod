@@ -11,6 +11,8 @@ require (
 )
 
 require (
+	buf.build/gen/go/bufbuild/eliza/connectrpc/go v1.11.0-20230726230109-bf1eaaff2a44.1 // indirect
+	buf.build/gen/go/bufbuild/eliza/protocolbuffers/go v1.31.0-20230726230109-bf1eaaff2a44.1 // indirect
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.31.0-20230824200731-b9b8148056b9.1 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230512164433-5d1fd1a340c9 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

@@ -181,15 +181,17 @@ func TestStreamingHandlerInterceptor_Receive(t *testing.T) {
 		test := tt
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			i, err := NewInterceptor()
+			interceptor, err := NewInterceptor()
 			require.NoError(t, err)
+
 			next := func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 				return conn.Receive(test.message)
 			}
 			conn := &mockStreamingHandlerConn{
 				receiveFunc: test.mock,
 			}
-			err = i.WrapStreamingHandler(next)(context.Background(), conn)
+
+			err = interceptor.WrapStreamingHandler(next)(context.Background(), conn)
 			if test.wantErr != "" {
 				require.Error(t, err)
 				assert.EqualError(t, err, test.wantErr)
