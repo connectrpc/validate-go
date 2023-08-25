@@ -24,7 +24,6 @@ import (
 	"fmt"
 
 	"connectrpc.com/connect"
-
 	"github.com/bufbuild/protovalidate-go"
 	"google.golang.org/protobuf/proto"
 )

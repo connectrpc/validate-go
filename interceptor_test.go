@@ -19,10 +19,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/bufbuild/protovalidate-go"
-
 	"buf.build/gen/go/bufbuild/protovalidate-testing/protocolbuffers/go/buf/validate/conformance/cases"
 	"connectrpc.com/connect"
+	"github.com/bufbuild/protovalidate-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,11 +29,13 @@ import (
 func TestNewInterceptor(t *testing.T) {
 	t.Parallel()
 	t.Run("success", func(t *testing.T) {
+		t.Parallel()
 		interceptor, err := NewInterceptor()
 		require.NoError(t, err)
 		assert.NotNil(t, interceptor.validator)
 	})
 	t.Run("success with validator", func(t *testing.T) {
+		t.Parallel()
 		validator, err := protovalidate.New()
 		require.NoError(t, err)
 		interceptor, err := NewInterceptor(WithInterceptor(validator))
@@ -108,6 +109,7 @@ var streamingTests = []struct {
 		mock: func(a any) error {
 			return nil
 		},
+		wantErr: "",
 	},
 	{
 		name:    "fail validation",
