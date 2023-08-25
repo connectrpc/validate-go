@@ -28,8 +28,6 @@ To use the `Interceptor`, follow these steps:
 
     ```go
     import (
-        "context"
-        
         "connectrpc.com/connect"
         "connectrpc.com/validate"
     )
