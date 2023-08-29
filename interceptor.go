@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package validate provides an interceptor implementation for the Connect that integrates 
+// Package validate provides an interceptor implementation for the Connect that integrates
 // with protovalidate to validate incoming protobuf messages against predefined constraints.
 // This interceptor ensures adherence to constraints defined on the proto file without the need
 // for extra generated code. Used this interceptor to automatically validate request messages
