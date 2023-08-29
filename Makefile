@@ -35,7 +35,8 @@ build: generate ## Build all packages
 	go build ./...
 
 .PHONY: generate
-generate: $(BIN)/license-header ## Regenerate code and licenses
+generate: $(BIN)/buf $(BIN)/license-header ## Regenerate code and licenses
+	buf generate
 	license-header \
 		--license-type apache \
 		--copyright-holder "Buf Technologies, Inc." \
@@ -63,6 +64,10 @@ upgrade: ## Upgrade dependencies
 checkgenerate:
 	@# Used in CI to verify that `make generate` doesn't produce a diff.
 	test -z "$$(git status --porcelain | tee /dev/stderr)"
+
+$(BIN)/buf: Makefile
+	@mkdir -p $(@D)
+	go install github.com/bufbuild/buf/cmd/buf@v1.26.1
 
 $(BIN)/license-header: Makefile
 	@mkdir -p $(@D)

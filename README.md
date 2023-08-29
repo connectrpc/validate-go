@@ -4,66 +4,72 @@
 [![Report Card](https://goreportcard.com/badge/connectrpc.com/validate)](https://goreportcard.com/report/connectrpc.com/validate)
 [![GoDoc](https://pkg.go.dev/badge/connectrpc.com/validate.svg)](https://pkg.go.dev/connectrpc.com/validate)
 
-The `validate` package provides an interceptor implementation for the ConnectRPC
-framework. It integrates with the [`protovalidate-go`][protovalidate-go] library
-to validate incoming protobuf messages, ensuring adherence to the defined
-message structure. This interceptor is a crucial layer in the communication
-pipeline, enhancing data integrity and reliability within the ConnectRPC
-framework.
+`connectrpc.com/validate` adds support for a protovalidate interceptor to Connect servers.
+
+[`protovalidate`][protovalidate-go] is a series of libraries designed to validate Protobuf messages at
+runtime based on user-defined validation rules. Powered by Google's Common
+Expression Language ([CEL][cel-spec]), it provides a
+flexible and efficient foundation for defining and evaluating custom validation
+rules. The primary goal of [`protovalidate`][protovalidate] is to help developers ensure data
+consistency and integrity across the network without requiring generated code.
 
 ## Installation
 
-To use the `validate` package, you need to have Go installed. You can then
-install the package using:
+Add the interceptor to your project with `go get`:
 
-```sh
-go get -u connectrpc.com/validate
+```bash
+go get connectrpc.com/validate
 ```
 
-## Usage
+## An Example
 
-To use the `Interceptor`, follow these steps:
+```go
+package main
 
-1. Import the necessary packages:
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
 
-    ```go
-    import (
-        "connectrpc.com/connect"
-        "connectrpc.com/validate"
-    )
-    ```
+	"connectrpc.com/connect"
+	"connectrpc.com/validate"
+	// Generated from your protobuf schema by protoc-gen-go and
+	// protoc-gen-connect-go.
+	pingv1 "connectrpc.com/validate/internal/gen/connect/ping/v1"
+	"connectrpc.com/validate/internal/gen/connect/ping/v1/pingv1connect"
+)
 
-2. Create a custom validator if needed (optional):
+func main() {
+	interceptor, err := validate.NewInterceptor()
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	mux := http.NewServeMux()
+	mux.Handle(pingv1connect.NewPingServiceHandler(
+		&pingv1connect.UnimplementedPingServiceHandler{},
+		connect.WithInterceptors(interceptor),
+	))
 
-    ```go
-    validator := protovalidate.New() // Customize the validator as needed
-    ```
+	http.ListenAndServe("localhost:8080", mux)
+}
 
-   > See [`protovalidate-go`][protovalidate-go] for more information on how to
-   construct
-   > a validator.
-
-3. Create an instance of the `Interceptor` using `NewInterceptor`:
-
-    ```go
-    interceptor, err := validate.NewInterceptor(validate.WithInterceptor(validator))
-    if err != nil {
-        // Handle error
-    }
-    ```
-
-   > If you do not provide a custom validator, the interceptor will create and
-   use
-   > a default validator.
-
-4. Apply the interceptor to your ConnectRPC server's handlers:
-
-    ```go
-    path, handler := examplev1connect.NewExampleServiceHandler(
-        server,
-        connect.WithInterceptors(interceptor),
-    )
-    ```
+func makeRequest() {
+	client := pingv1connect.NewPingServiceClient(
+		http.DefaultClient,
+		"http://localhost:8080",
+	)
+	resp, err := client.Ping(
+		context.Background(),
+		connect.NewRequest(&pingv1.PingRequest{}),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(resp)
+}
+```
 
 By applying the interceptor to your server's handlers, you ensure that incoming
 requests are thoroughly validated before being processed. This practice
@@ -81,3 +87,5 @@ Offered under the [Apache 2 license](LICENSE).
 
 [connect-go]: https://github.com/connectrpc/connect-go
 [protovalidate-go]: https://github.com/bufbuild/protovalidate-go
+[cel-spec]: https://github.com/google/cel-spec
+[protovalidate]: https://github.com/bufbuild/protovalidate

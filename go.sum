@@ -1,7 +1,3 @@
-buf.build/gen/go/bufbuild/eliza/connectrpc/go v1.11.0-20230726230109-bf1eaaff2a44.1 h1:qDmGvqEUMAlavAQplT6psGWLCZmkYSTQ9FQIff+P7Kw=
-buf.build/gen/go/bufbuild/eliza/connectrpc/go v1.11.0-20230726230109-bf1eaaff2a44.1/go.mod h1:HM9AnJ1yQFbQoMTNOVvmjVeI/NU3BhDviIE3/2yDEPQ=
-buf.build/gen/go/bufbuild/eliza/protocolbuffers/go v1.31.0-20230726230109-bf1eaaff2a44.1 h1:NmZA1X/FWAyvcZtcQ2UcCwaeE7LtDbLxjqqMf9G2qvE=
-buf.build/gen/go/bufbuild/eliza/protocolbuffers/go v1.31.0-20230726230109-bf1eaaff2a44.1/go.mod h1:mEpu8C3+7iXJhc3ajuUwWLB8FLrhyu9nzdcMqq5ZsXM=
 buf.build/gen/go/bufbuild/protovalidate-testing/protocolbuffers/go v1.31.0-20230824200732-8bc04916caea.1 h1:wWsaA01KC5hgoW4oHFiGzEqMmgcE7UyU43F8AJrex1U=
 buf.build/gen/go/bufbuild/protovalidate-testing/protocolbuffers/go v1.31.0-20230824200732-8bc04916caea.1/go.mod h1:cJ4gQkiW4uPTUTI3+O2862OzMSTnzrFNwMauHLwPDPg=
 buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.31.0-20230824200731-b9b8148056b9.1 h1:9Ea7lsYYvoyqmq79GbCy6POXHrZbC+pHs+6lGNx9IBQ=

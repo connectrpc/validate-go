@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate-testing/protocolbuffers/go v1.31.0-20230824200732-8bc04916caea.1
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.31.0-20230824200731-b9b8148056b9.1
 	connectrpc.com/connect v1.11.0
 	github.com/bufbuild/protovalidate-go v0.3.0
 	github.com/stretchr/testify v1.8.4
@@ -11,9 +12,6 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/eliza/connectrpc/go v1.11.0-20230726230109-bf1eaaff2a44.1 // indirect
-	buf.build/gen/go/bufbuild/eliza/protocolbuffers/go v1.31.0-20230726230109-bf1eaaff2a44.1 // indirect
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.31.0-20230824200731-b9b8148056b9.1 // indirect
 	github.com/antlr/antlr4/runtime/Go/antlr/v4 v4.0.0-20230512164433-5d1fd1a340c9 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/cel-go v0.17.4 // indirect

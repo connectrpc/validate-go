@@ -56,7 +56,7 @@ type Option func(*Interceptor)
 //
 // Usage:
 //
-//	interceptor, err := NewInterceptor(WithInterceptor(customValidator))
+//	interceptor, err := NewInterceptor(WithValidator(customValidator))
 //	if err != nil {
 //	  // Handle error
 //	}
@@ -82,9 +82,9 @@ func NewInterceptor(opts ...Option) (*Interceptor, error) {
 	return out, nil
 }
 
-// WithInterceptor sets the validator to be used for message validation.
+// WithValidator sets the validator to be used for message validation.
 // This option allows customization of the validator used by the Interceptor.
-func WithInterceptor(validator *protovalidate.Validator) Option {
+func WithValidator(validator *protovalidate.Validator) Option {
 	return func(i *Interceptor) {
 		i.validator = validator
 	}
@@ -140,10 +140,10 @@ type streamingHandlerInterceptor struct {
 }
 
 func (s *streamingHandlerInterceptor) Receive(msg any) error {
-	if err := validate(s.validator, msg); err != nil {
+	if err := s.StreamingHandlerConn.Receive(msg); err != nil {
 		return err
 	}
-	return s.StreamingHandlerConn.Receive(msg)
+	return validate(s.validator, msg)
 }
 
 func validate(validator *protovalidate.Validator, msg any) error {

@@ -54,8 +54,11 @@ issues:
   exclude-rules:
     - path: interceptor_test.go
       linters:
-        - gochecknoglobals
         - exhaustruct
+        - dupl
     - path: interceptor.go
+      linters:
+        - exhaustruct
+    - path: internal/testserver
       linters:
         - exhaustruct
