@@ -33,13 +33,7 @@ message PingRequest {
 }
 
 message PingResponse {
-    int64 number = 1 [
-        (buf.validate.field).required = true,
-        (buf.validate.field).int64 = {
-            gt: 0,
-            lt: 100
-        }
-    ];
+    int64 number = 1;
 }
 
 message SumRequest {
@@ -77,6 +71,4 @@ service PingService {
     rpc Sum(stream SumRequest) returns (SumResponse) {}
     // CountUp returns a stream of the numbers up to the given request.
     rpc CountUp(CountUpRequest) returns (stream CountUpResponse) {}
-//    // CumSum determines the cumulative sum of all the numbers sent on the stream.
-//    rpc CumSum(stream CumSumRequest) returns (stream CumSumResponse) {}
 }

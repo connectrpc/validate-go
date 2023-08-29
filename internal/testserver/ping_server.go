@@ -67,11 +67,7 @@ func (p *pingServer) Sum(_ context.Context, stream *connect.ClientStream[pingv1.
 	return connect.NewResponse(&pingv1.SumResponse{Sum: sum}), nil
 }
 
-func (p *pingServer) CountUp(
-	_ context.Context,
-	request *connect.Request[pingv1.CountUpRequest],
-	stream *connect.ServerStream[pingv1.CountUpResponse],
-) error {
+func (p *pingServer) CountUp(_ context.Context, request *connect.Request[pingv1.CountUpRequest], stream *connect.ServerStream[pingv1.CountUpResponse]) error {
 	if p.err != nil {
 		return p.err
 	}
