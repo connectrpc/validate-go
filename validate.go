@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package validate provides an interceptor implementation for the Connect that integrates
-// with protovalidate to validate incoming protobuf messages against predefined constraints.
-// This interceptor ensures adherence to constraints defined on the proto file without the need
-// for extra generated code. Used this interceptor to automatically validate request messages
-// and enhance the reliability of data communication.
+// Package validate provides a [connect.Interceptor] that validates Protobuf
+// messages against constraints specified in the schema. Because the
+// interceptor is powered by [protovalidate], validation is flexible,
+// efficient, and consistent across languages - without additional code
+// generation.
 package validate
 
 import (
@@ -29,69 +29,61 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Interceptor implements the connect.Interceptor interface and serves as a crucial
-// layer in the communication pipeline, by validating incoming requests and ensuring
-// they conform to defined protovalidate preconditions.
+// An Option configures an [Interceptor].
+type Option interface {
+	apply(*Interceptor)
+}
+
+// WithValidator configures the [Interceptor] to use a customized
+// [protovalidate.Validator]. See [protovalidate.ValidatorOption] for the range
+// of available customizations.
+func WithValidator(validator *protovalidate.Validator) Option {
+	return optionFunc(func(i *Interceptor) {
+		i.validator = validator
+	})
+}
+
+// Interceptor is a [connect.Interceptor] that ensures that RPC request
+// messages match the constraints expressed in their Protobuf schemas. It does
+// not validate response messages.
 //
-// Default Behaviors:
-//   - Requests are validated for adherence to the defined message structure.
-//   - Responses are not validated, focusing validation efforts on incoming data.
-//   - Errors are raised for incoming messages that are not protocol buffer messages.
-//   - In case of validation errors, an error detail of the type is attached to provide
-//     additional context about the validation failure.
+// By default, Interceptors use a validator that lazily compiles constraints
+// and works with any Protobuf message. This is a simple, widely-applicable
+// configuration: after compiling and caching the constraints for a Protobuf
+// message type once, validation is very efficient. To customize the validator,
+// use [WithValidator] and [protovalidate.ValidatorOption].
 //
-// It's recommended to use the Interceptor with server-side handlers rather than
-// client connections. Placing the Interceptor on handlers ensures that incoming requests
-// are thoroughly validated before they are processed, minimizing the risk of handling
-// invalid or unexpected data.
+// RPCs with invalid request messages short-circuit with an error. The error
+// always uses [connect.CodeInvalidArgument] and has a [detailed representation
+// of the error] attached as a [connect.ErrorDetail].
+//
+// This interceptor is primarily intended for use on handlers. Client-side use
+// is possible, but discouraged unless the client always has an up-to-date
+// schema.
 type Interceptor struct {
 	validator *protovalidate.Validator
 }
 
-// Option is a functional option for the Interceptor.
-type Option func(*Interceptor)
-
-// NewInterceptor returns a new instance of the Interceptor. It accepts an optional functional
-// option to customize its behavior. If no custom validator is provided, a default validator
-// is used for message validation.
-//
-// Usage:
-//
-//	interceptor, err := NewInterceptor(WithValidator(customValidator))
-//	if err != nil {
-//	  // Handle error
-//	}
-//
-//	path, handler := examplev1connect.NewExampleServiceHandler(
-//		server,
-//		connect.WithInterceptors(interceptor),
-//	)
+// NewInterceptor builds an Interceptor. The default configuration is
+// appropriate for most use cases.
 func NewInterceptor(opts ...Option) (*Interceptor, error) {
-	out := &Interceptor{}
-	for _, apply := range opts {
-		apply(out)
+	var interceptor Interceptor
+	for _, opt := range opts {
+		opt.apply(&interceptor)
 	}
 
-	if out.validator == nil {
+	if interceptor.validator == nil {
 		validator, err := protovalidate.New()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("construct validator: %w", err)
 		}
-		out.validator = validator
+		interceptor.validator = validator
 	}
 
-	return out, nil
+	return &interceptor, nil
 }
 
-// WithValidator sets the validator to be used for message validation.
-// This option allows customization of the validator used by the Interceptor.
-func WithValidator(validator *protovalidate.Validator) Option {
-	return func(i *Interceptor) {
-		i.validator = validator
-	}
-}
-
-// WrapUnary implements the connect.Interceptor interface.
+// WrapUnary implements connect.Interceptor.
 func (i *Interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 		if err := validate(i.validator, req.Any()); err != nil {
@@ -101,7 +93,7 @@ func (i *Interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	}
 }
 
-// WrapStreamingClient implements the connect.Interceptor interface.
+// WrapStreamingClient implements connect.Interceptor.
 func (i *Interceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
 	return func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
 		return &streamingClientInterceptor{
@@ -111,7 +103,7 @@ func (i *Interceptor) WrapStreamingClient(next connect.StreamingClientFunc) conn
 	}
 }
 
-// WrapStreamingHandler implements the connect.Interceptor interface.
+// WrapStreamingHandler implements connect.Interceptor.
 func (i *Interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		return next(ctx, &streamingHandlerInterceptor{
@@ -147,20 +139,24 @@ func (s *streamingHandlerInterceptor) Receive(msg any) error {
 	return validate(s.validator, msg)
 }
 
+type optionFunc func(*Interceptor)
+
+func (f optionFunc) apply(i *Interceptor) { f(i) }
+
 func validate(validator *protovalidate.Validator, msg any) error {
-	protoMessage, ok := msg.(proto.Message)
+	protoMsg, ok := msg.(proto.Message)
 	if !ok {
-		return fmt.Errorf("message is not a proto.Message: %T", msg)
+		return fmt.Errorf("expected proto.Message, got %T", msg)
 	}
-	if err := validator.Validate(protoMessage); err != nil {
-		out := connect.NewError(connect.CodeInvalidArgument, err)
-		var validationErr *protovalidate.ValidationError
-		if errors.As(err, &validationErr) {
-			if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
-				out.AddDetail(detail)
-			}
+	err := validator.Validate(protoMsg)
+	if err == nil {
+		return nil
+	}
+	connectErr := connect.NewError(connect.CodeInvalidArgument, err)
+	if validationErr := new(protovalidate.ValidationError); errors.As(err, &validationErr) {
+		if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
+			connectErr.AddDetail(detail)
 		}
-		return out
 	}
-	return nil
+	return connectErr
 }
