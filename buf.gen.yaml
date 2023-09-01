@@ -6,11 +6,9 @@ managed:
     except:
       - buf.build/bufbuild/protovalidate
 plugins:
-  - plugin: buf.build/connectrpc/go
+  - plugin: go
     out: internal/gen
-    opt:
-      - paths=source_relative
-  - plugin: buf.build/protocolbuffers/go
+    opt: paths=source_relative
+  - plugin: connect-go
     out: internal/gen
-    opt:
-      - paths=source_relative
+    opt: paths=source_relative
