@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package validate provides a [connect.Interceptor] that validates Protobuf
-// messages against constraints specified in the schema. Because the
+// Package validate provides a [connect.Interceptor] that validates messages
+// against constraints specified in their Protobuf schemas. Because the
 // interceptor is powered by [protovalidate], validation is flexible,
 // efficient, and consistent across languages - without additional code
 // generation.
@@ -60,6 +60,8 @@ func WithValidator(validator *protovalidate.Validator) Option {
 // This interceptor is primarily intended for use on handlers. Client-side use
 // is possible, but discouraged unless the client always has an up-to-date
 // schema.
+//
+// [detailed representation of the error]: https://pkg.go.dev/buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate#Violations
 type Interceptor struct {
 	validator *protovalidate.Validator
 }
