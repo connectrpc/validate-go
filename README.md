@@ -96,8 +96,8 @@ func main() {
 	}
 	
 	mux := http.NewServeMux()
-	mux.Handle(user1connect.NewPingServiceHandler(
-		&pingv1connect.UnimplementedPingServiceHandler{},
+	mux.Handle(userv1connect.NewUserServiceHandler(
+		&userv1connect.UnimplementedUserServiceHandler{},
 		connect.WithInterceptors(interceptor),
 	))
 
@@ -111,19 +111,19 @@ hand-written boilerplate!
 
 ## FAQ
 
-**Does this interceptor work with Connect clients?**
+### Does this interceptor work with Connect clients?
 
 Yes: it validates request messages before sending them to the server. But
 unless you're _sure_ that your clients always have an up-to-date schema, it's
 better to let the server handle validation.
 
-**How do clients know which fields are invalid?**
+### How do clients know which fields are invalid?
 
 If the request message fails validation, the interceptor returns an error coded
 with `connect.CodeInvalidArgument`. It also adds a [detailed representation of the
 validation error(s)][violations] as an [error detail][connect-error-detail].
 
-**How should schemas import protovalidate's options?**
+### How should schemas import protovalidate's options?
 
 Because this interceptor uses [protovalidate][protovalidate-go], it doesn't
 need any generated code for validation. However, any Protobuf schemas with
@@ -161,11 +161,13 @@ major version.
 
 Offered under the [Apache 2 license](LICENSE).
 
-[connect-go]: https://github.com/connectrpc/connect-go
-[protovalidate-go]: https://github.com/bufbuild/protovalidate-go
-[cel-spec]: https://github.com/google/cel-spec
-[protovalidate]: https://github.com/bufbuild/protovalidate
-[violations]: https://pkg.go.dev/buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate#Violations
-[connect-error-detail]: https://pkg.go.dev/connectrpc.com/connect#ErrorDetail
+[APIv2]: https://blog.golang.org/protobuf-apiv2
 [bsr]: https://buf.build
+[cel-spec]: https://github.com/google/cel-spec
+[connect-error-detail]: https://pkg.go.dev/connectrpc.com/connect#ErrorDetail
+[connect-go]: https://github.com/connectrpc/connect-go
+[go-support-policy]: https://golang.org/doc/devel/release#policy
+[protovalidate-go]: https://github.com/bufbuild/protovalidate-go
+[protovalidate]: https://github.com/bufbuild/protovalidate
 [validate.proto]: https://github.com/bufbuild/protovalidate/blob/main/proto/protovalidate/buf/validate/validate.proto
+[violations]: https://pkg.go.dev/buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate#Violations
