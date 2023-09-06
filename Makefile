@@ -35,20 +35,25 @@ build: generate ## Build all packages
 	go build ./...
 
 .PHONY: generate
-generate: $(BIN)/license-header ## Regenerate code and licenses
+generate: $(BIN)/buf $(BIN)/license-header $(BIN)/protoc-gen-go $(BIN)/protoc-gen-connect-go ## Regenerate code and licenses
+	rm -rf internal/gen
+	buf generate
 	license-header \
 		--license-type apache \
 		--copyright-holder "Buf Technologies, Inc." \
 		--year-range "$(COPYRIGHT_YEARS)" $(LICENSE_IGNORE)
 
 .PHONY: lint
-lint: $(BIN)/golangci-lint ## Lint
+lint: $(BIN)/golangci-lint $(BIN)/buf ## Lint
 	go vet ./...
 	golangci-lint run
+	buf lint
+	buf format -d --exit-code
 
 .PHONY: lintfix
-lintfix: $(BIN)/golangci-lint ## Automatically fix some lint errors
+lintfix: $(BIN)/golangci-lint $(BIN)/buf ## Automatically fix some lint errors
 	golangci-lint run --fix
+	buf format -w
 
 .PHONY: install
 install: ## Install all binaries
@@ -56,13 +61,16 @@ install: ## Install all binaries
 
 .PHONY: upgrade
 upgrade: ## Upgrade dependencies
-	go get -u -t ./...
-	go mod tidy -v
+	go get -u -t ./... && go mod tidy -v
 
 .PHONY: checkgenerate
 checkgenerate:
 	@# Used in CI to verify that `make generate` doesn't produce a diff.
 	test -z "$$(git status --porcelain | tee /dev/stderr)"
+
+$(BIN)/buf: Makefile
+	@mkdir -p $(@D)
+	go install github.com/bufbuild/buf/cmd/buf@v1.26.1
 
 $(BIN)/license-header: Makefile
 	@mkdir -p $(@D)
@@ -71,3 +79,13 @@ $(BIN)/license-header: Makefile
 $(BIN)/golangci-lint: Makefile
 	@mkdir -p $(@D)
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.1
+
+$(BIN)/protoc-gen-connect-go: Makefile go.mod
+	@mkdir -p $(@D)
+	@# The version of protoc-gen-connect-go is determined by the version in go.mod
+	go install connectrpc.com/connect/cmd/protoc-gen-connect-go
+
+$(BIN)/protoc-gen-go: Makefile go.mod
+	@mkdir -p $(@D)
+	@# The version of protoc-gen-go is determined by the version in go.mod
+	go install google.golang.org/protobuf/cmd/protoc-gen-go

@@ -3,6 +3,10 @@ run:
 linters-settings:
   errcheck:
     check-type-assertions: true
+  exhaustruct:
+    include:
+      # No zero values for param structs.
+      - 'connectrpc\.com/connect\..*[pP]arams'
   forbidigo:
     forbid:
       - '^fmt\.Print'
@@ -13,7 +17,7 @@ linters-settings:
   godox:
     # TODO, OPT, etc. comments are fine to commit. Use FIXME comments for
     # temporary hacks, and use godox to prevent committing them.
-    keywords: [FIXME]
+    keywords: [ FIXME ]
   varnamelen:
     ignore-decls:
       - T any
