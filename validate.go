@@ -97,8 +97,8 @@ func (i *Interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 func (i *Interceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
 	return func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
 		return &streamingClientInterceptor{
-			validator:           i.validator,
 			StreamingClientConn: next(ctx, spec),
+			validator:           i.validator,
 		}
 	}
 }
@@ -107,8 +107,8 @@ func (i *Interceptor) WrapStreamingClient(next connect.StreamingClientFunc) conn
 func (i *Interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		return next(ctx, &streamingHandlerInterceptor{
-			validator:            i.validator,
 			StreamingHandlerConn: conn,
+			validator:            i.validator,
 		})
 	}
 }
