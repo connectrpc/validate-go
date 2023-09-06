@@ -29,4 +29,3 @@ message CumSumResponse {
 service CalculatorService {
   rpc CumSum(stream CumSumRequest) returns (stream CumSumResponse) {}
 }
-

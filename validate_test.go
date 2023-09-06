@@ -40,20 +40,20 @@ func TestInterceptorUnary(t *testing.T) {
 	tests := []struct {
 		name     string
 		svc      func(context.Context, *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error)
-		req      userv1.CreateUserRequest
+		req      *userv1.CreateUserRequest
 		wantCode connect.Code
 		wantPath string // field path, from error details
 	}{
 		{
 			name: "valid",
 			svc:  createUser,
-			req: userv1.CreateUserRequest{
+			req: &userv1.CreateUserRequest{
 				User: &userv1.User{Email: "someone@example.com"},
 			},
 		},
 		{
 			name: "invalid",
-			req: userv1.CreateUserRequest{
+			req: &userv1.CreateUserRequest{
 				User: &userv1.User{Email: "foo"},
 			},
 			wantCode: connect.CodeInvalidArgument,
@@ -64,15 +64,15 @@ func TestInterceptorUnary(t *testing.T) {
 			svc: func(_ context.Context, req *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error) {
 				return nil, connect.NewError(connect.CodeInternal, errors.New("oh no"))
 			},
-			req: userv1.CreateUserRequest{
+			req: &userv1.CreateUserRequest{
 				User: &userv1.User{Email: "someone@example.com"},
 			},
 			wantCode: connect.CodeInternal,
 		},
 	}
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
 			validator, err := validate.NewInterceptor()
@@ -81,20 +81,20 @@ func TestInterceptorUnary(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.Handle(userv1connect.UserServiceCreateUserProcedure, connect.NewUnaryHandler(
 				userv1connect.UserServiceCreateUserProcedure,
-				tt.svc,
+				test.svc,
 				connect.WithInterceptors(validator),
 			))
 			srv := startHTTPServer(t, mux)
 
 			got, err := userv1connect.NewUserServiceClient(srv.Client(), srv.URL).
-				CreateUser(context.Background(), connect.NewRequest(&tt.req))
+				CreateUser(context.Background(), connect.NewRequest(test.req))
 
-			if tt.wantCode > 0 {
+			if test.wantCode > 0 {
 				require.Error(t, err)
 				var connectErr *connect.Error
 				require.True(t, errors.As(err, &connectErr))
-				assert.Equal(t, tt.wantCode, connectErr.Code())
-				if tt.wantPath != "" {
+				assert.Equal(t, test.wantCode, connectErr.Code())
+				if test.wantPath != "" {
 					details := connectErr.Details()
 					require.Len(t, details, 1)
 					detail, err := details[0].Value()
@@ -102,7 +102,7 @@ func TestInterceptorUnary(t *testing.T) {
 					violations, ok := detail.(*validatepb.Violations)
 					require.True(t, ok)
 					require.Len(t, violations.Violations, 1)
-					require.Equal(t, tt.wantPath, violations.Violations[0].FieldPath)
+					require.Equal(t, test.wantPath, violations.Violations[0].FieldPath)
 				}
 			} else {
 				require.NoError(t, err)
@@ -117,32 +117,32 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 	tests := []struct {
 		name     string
 		svc      func(context.Context, *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error
-		req      calculatorv1.CumSumRequest
+		req      *calculatorv1.CumSumRequest
 		wantCode connect.Code
 		wantPath string // field path, from error details
 	}{
 		{
 			name:     "invalid",
 			svc:      cumSumSuccess,
-			req:      calculatorv1.CumSumRequest{Number: 0},
+			req:      &calculatorv1.CumSumRequest{Number: 0},
 			wantCode: connect.CodeInvalidArgument,
 			wantPath: "number",
 		},
 		{
 			name: "valid",
 			svc:  cumSumSuccess,
-			req:  calculatorv1.CumSumRequest{Number: 1},
+			req:  &calculatorv1.CumSumRequest{Number: 1},
 		},
 		{
 			name:     "underlying_error",
 			svc:      cumSumError,
-			req:      calculatorv1.CumSumRequest{Number: 1},
+			req:      &calculatorv1.CumSumRequest{Number: 1},
 			wantCode: connect.CodeInternal,
 		},
 	}
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
 			validator, err := validate.NewInterceptor()
@@ -151,7 +151,7 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.Handle(calculatorv1connect.CalculatorServiceCumSumProcedure, connect.NewBidiStreamHandler(
 				calculatorv1connect.CalculatorServiceCumSumProcedure,
-				tt.svc,
+				test.svc,
 				connect.WithInterceptors(validator),
 			))
 			srv := httptest.NewUnstartedServer(mux)
@@ -170,17 +170,17 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 				assert.NoError(t, stream.CloseRequest())
 			})
 
-			err = stream.Send(&tt.req)
+			err = stream.Send(test.req)
 			require.NoError(t, err)
 			time.Sleep(time.Second)
 			got, err := stream.Receive()
 
-			if tt.wantCode > 0 {
+			if test.wantCode > 0 {
 				require.Error(t, err)
 				var connectErr *connect.Error
 				assert.True(t, errors.As(err, &connectErr))
-				assert.Equal(t, tt.wantCode, connectErr.Code())
-				if tt.wantPath != "" {
+				assert.Equal(t, test.wantCode, connectErr.Code())
+				if test.wantPath != "" {
 					details := connectErr.Details()
 					require.Len(t, details, 1)
 					detail, err := details[0].Value()
@@ -188,7 +188,7 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 					violations, ok := detail.(*validatepb.Violations)
 					require.True(t, ok)
 					require.Len(t, violations.Violations, 1)
-					require.Equal(t, tt.wantPath, violations.Violations[0].FieldPath)
+					require.Equal(t, test.wantPath, violations.Violations[0].FieldPath)
 				}
 			} else {
 				require.NoError(t, err)
@@ -203,7 +203,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 	tests := []struct {
 		name            string
 		svc             func(context.Context, *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error
-		req             calculatorv1.CumSumRequest
+		req             *calculatorv1.CumSumRequest
 		wantCode        connect.Code
 		wantPath        string       // field path, from error details
 		wantReceiveCode connect.Code // code for error calling Receive()
@@ -211,25 +211,25 @@ func TestInterceptorStreamingClient(t *testing.T) {
 		{
 			name:     "invalid",
 			svc:      cumSumSuccess,
-			req:      calculatorv1.CumSumRequest{Number: 0},
+			req:      &calculatorv1.CumSumRequest{Number: 0},
 			wantCode: connect.CodeInvalidArgument,
 			wantPath: "number",
 		},
 		{
 			name: "valid",
 			svc:  cumSumSuccess,
-			req:  calculatorv1.CumSumRequest{Number: 1},
+			req:  &calculatorv1.CumSumRequest{Number: 1},
 		},
 		{
 			name:            "underlying_error",
 			svc:             cumSumError,
-			req:             calculatorv1.CumSumRequest{Number: 1},
+			req:             &calculatorv1.CumSumRequest{Number: 1},
 			wantReceiveCode: connect.CodeInternal,
 		},
 	}
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
 			validator, err := validate.NewInterceptor()
@@ -238,7 +238,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 			mux := http.NewServeMux()
 			mux.Handle(calculatorv1connect.CalculatorServiceCumSumProcedure, connect.NewBidiStreamHandler(
 				calculatorv1connect.CalculatorServiceCumSumProcedure,
-				tt.svc,
+				test.svc,
 			))
 			srv := httptest.NewUnstartedServer(mux)
 			srv.EnableHTTP2 = true
@@ -260,14 +260,14 @@ func TestInterceptorStreamingClient(t *testing.T) {
 				assert.NoError(t, stream.CloseRequest())
 			})
 
-			err = stream.Send(&tt.req)
-			if tt.wantCode > 0 {
+			err = stream.Send(test.req)
+			if test.wantCode > 0 {
 				require.Error(t, err)
 				var connectErr *connect.Error
 				assert.True(t, errors.As(err, &connectErr))
 				t.Log(connectErr)
-				assert.Equal(t, tt.wantCode, connectErr.Code())
-				if tt.wantPath != "" {
+				assert.Equal(t, test.wantCode, connectErr.Code())
+				if test.wantPath != "" {
 					details := connectErr.Details()
 					require.Len(t, details, 1)
 					detail, err := details[0].Value()
@@ -275,13 +275,13 @@ func TestInterceptorStreamingClient(t *testing.T) {
 					violations, ok := detail.(*validatepb.Violations)
 					require.True(t, ok)
 					require.Len(t, violations.Violations, 1)
-					require.Equal(t, tt.wantPath, violations.Violations[0].FieldPath)
+					require.Equal(t, test.wantPath, violations.Violations[0].FieldPath)
 				}
 			} else {
 				require.NoError(t, err)
 				got, receiveErr := stream.Receive()
-				if tt.wantReceiveCode > 0 {
-					require.Equal(t, connect.CodeOf(receiveErr), tt.wantReceiveCode)
+				if test.wantReceiveCode > 0 {
+					require.Equal(t, connect.CodeOf(receiveErr), test.wantReceiveCode)
 				} else {
 					require.NoError(t, receiveErr)
 					require.NotZero(t, got.Sum)
@@ -342,9 +342,8 @@ func cumSumSuccess(_ context.Context, stream *connect.BidiStream[calculatorv1.Cu
 			return err
 		}
 	}
-	return nil
 }
 
-func cumSumError(_ context.Context, stream *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error {
+func cumSumError(_ context.Context, _ *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error {
 	return connect.NewError(connect.CodeInternal, errors.New("boom"))
 }
