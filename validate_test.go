@@ -17,427 +17,334 @@ package validate_test
 import (
 	"context"
 	"errors"
-	"fmt"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
-	validateproto "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	validatepb "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	"connectrpc.com/connect"
 	"connectrpc.com/validate"
-	pingv1 "connectrpc.com/validate/internal/gen/connect/ping/v1"
-	"connectrpc.com/validate/internal/gen/connect/ping/v1/pingv1connect"
-	"connectrpc.com/validate/internal/testserver"
+	calculatorv1 "connectrpc.com/validate/internal/gen/example/calculator/v1"
+	"connectrpc.com/validate/internal/gen/example/calculator/v1/calculatorv1connect"
+	userv1 "connectrpc.com/validate/internal/gen/example/user/v1"
+	"connectrpc.com/validate/internal/gen/example/user/v1/userv1connect"
 	"github.com/bufbuild/protovalidate-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewInterceptor(t *testing.T) {
+func TestInterceptorUnary(t *testing.T) {
 	t.Parallel()
-	t.Run("success", func(t *testing.T) {
-		t.Parallel()
-		interceptor, err := validate.NewInterceptor()
-		require.NoError(t, err)
-		assert.NotNil(t, interceptor)
+	tests := []struct {
+		name     string
+		svc      func(context.Context, *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error)
+		req      userv1.CreateUserRequest
+		wantCode connect.Code
+		wantPath string // field path, from error details
+	}{
+		{
+			name: "valid",
+			svc:  createUser,
+			req: userv1.CreateUserRequest{
+				User: &userv1.User{Email: "someone@example.com"},
+			},
+		},
+		{
+			name: "invalid",
+			req: userv1.CreateUserRequest{
+				User: &userv1.User{Email: "foo"},
+			},
+			wantCode: connect.CodeInvalidArgument,
+			wantPath: "user.email",
+		},
+		{
+			name: "underlying_error",
+			svc: func(_ context.Context, req *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error) {
+				return nil, connect.NewError(connect.CodeInternal, errors.New("oh no"))
+			},
+			req: userv1.CreateUserRequest{
+				User: &userv1.User{Email: "someone@example.com"},
+			},
+			wantCode: connect.CodeInternal,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			validator, err := validate.NewInterceptor()
+			require.NoError(t, err)
+
+			mux := http.NewServeMux()
+			mux.Handle(userv1connect.UserServiceCreateUserProcedure, connect.NewUnaryHandler(
+				userv1connect.UserServiceCreateUserProcedure,
+				tt.svc,
+				connect.WithInterceptors(validator),
+			))
+			srv := startHTTPServer(t, mux)
+
+			got, err := userv1connect.NewUserServiceClient(srv.Client(), srv.URL).
+				CreateUser(context.Background(), connect.NewRequest(&tt.req))
+
+			if tt.wantCode > 0 {
+				require.Error(t, err)
+				var connectErr *connect.Error
+				require.True(t, errors.As(err, &connectErr))
+				assert.Equal(t, tt.wantCode, connectErr.Code())
+				if tt.wantPath != "" {
+					details := connectErr.Details()
+					require.Len(t, details, 1)
+					detail, err := details[0].Value()
+					require.NoError(t, err)
+					violations, ok := detail.(*validatepb.Violations)
+					require.True(t, ok)
+					require.Len(t, violations.Violations, 1)
+					require.Equal(t, tt.wantPath, violations.Violations[0].FieldPath)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.NotZero(t, got.Msg)
+			}
+		})
+	}
+}
+
+func TestInterceptorStreamingHandler(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		svc      func(context.Context, *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error
+		req      calculatorv1.CumSumRequest
+		wantCode connect.Code
+		wantPath string // field path, from error details
+	}{
+		{
+			name:     "invalid",
+			svc:      cumSumSuccess,
+			req:      calculatorv1.CumSumRequest{Number: 0},
+			wantCode: connect.CodeInvalidArgument,
+			wantPath: "number",
+		},
+		{
+			name: "valid",
+			svc:  cumSumSuccess,
+			req:  calculatorv1.CumSumRequest{Number: 1},
+		},
+		{
+			name:     "underlying_error",
+			svc:      cumSumError,
+			req:      calculatorv1.CumSumRequest{Number: 1},
+			wantCode: connect.CodeInternal,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			validator, err := validate.NewInterceptor()
+			require.NoError(t, err)
+
+			mux := http.NewServeMux()
+			mux.Handle(calculatorv1connect.CalculatorServiceCumSumProcedure, connect.NewBidiStreamHandler(
+				calculatorv1connect.CalculatorServiceCumSumProcedure,
+				tt.svc,
+				connect.WithInterceptors(validator),
+			))
+			srv := httptest.NewUnstartedServer(mux)
+			srv.EnableHTTP2 = true
+			srv.StartTLS()
+			t.Cleanup(srv.Close)
+
+			client := calculatorv1connect.NewCalculatorServiceClient(srv.Client(), srv.URL)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			t.Cleanup(cancel)
+			stream := client.CumSum(ctx)
+			t.Cleanup(func() {
+				assert.NoError(t, stream.CloseResponse())
+			})
+			t.Cleanup(func() {
+				assert.NoError(t, stream.CloseRequest())
+			})
+
+			err = stream.Send(&tt.req)
+			require.NoError(t, err)
+			time.Sleep(time.Second)
+			got, err := stream.Receive()
+
+			if tt.wantCode > 0 {
+				require.Error(t, err)
+				var connectErr *connect.Error
+				assert.True(t, errors.As(err, &connectErr))
+				assert.Equal(t, tt.wantCode, connectErr.Code())
+				if tt.wantPath != "" {
+					details := connectErr.Details()
+					require.Len(t, details, 1)
+					detail, err := details[0].Value()
+					require.NoError(t, err)
+					violations, ok := detail.(*validatepb.Violations)
+					require.True(t, ok)
+					require.Len(t, violations.Violations, 1)
+					require.Equal(t, tt.wantPath, violations.Violations[0].FieldPath)
+				}
+			} else {
+				require.NoError(t, err)
+				require.NotZero(t, got.Sum)
+			}
+		})
+	}
+}
+
+func TestInterceptorStreamingClient(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name            string
+		svc             func(context.Context, *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error
+		req             calculatorv1.CumSumRequest
+		wantCode        connect.Code
+		wantPath        string       // field path, from error details
+		wantReceiveCode connect.Code // code for error calling Receive()
+	}{
+		{
+			name:     "invalid",
+			svc:      cumSumSuccess,
+			req:      calculatorv1.CumSumRequest{Number: 0},
+			wantCode: connect.CodeInvalidArgument,
+			wantPath: "number",
+		},
+		{
+			name: "valid",
+			svc:  cumSumSuccess,
+			req:  calculatorv1.CumSumRequest{Number: 1},
+		},
+		{
+			name:            "underlying_error",
+			svc:             cumSumError,
+			req:             calculatorv1.CumSumRequest{Number: 1},
+			wantReceiveCode: connect.CodeInternal,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			validator, err := validate.NewInterceptor()
+			require.NoError(t, err)
+
+			mux := http.NewServeMux()
+			mux.Handle(calculatorv1connect.CalculatorServiceCumSumProcedure, connect.NewBidiStreamHandler(
+				calculatorv1connect.CalculatorServiceCumSumProcedure,
+				tt.svc,
+			))
+			srv := httptest.NewUnstartedServer(mux)
+			srv.EnableHTTP2 = true
+			srv.StartTLS()
+			t.Cleanup(srv.Close)
+
+			client := calculatorv1connect.NewCalculatorServiceClient(
+				srv.Client(),
+				srv.URL,
+				connect.WithInterceptors(validator),
+			)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			t.Cleanup(cancel)
+			stream := client.CumSum(ctx)
+			t.Cleanup(func() {
+				assert.NoError(t, stream.CloseResponse())
+			})
+			t.Cleanup(func() {
+				assert.NoError(t, stream.CloseRequest())
+			})
+
+			err = stream.Send(&tt.req)
+			if tt.wantCode > 0 {
+				require.Error(t, err)
+				var connectErr *connect.Error
+				assert.True(t, errors.As(err, &connectErr))
+				t.Log(connectErr)
+				assert.Equal(t, tt.wantCode, connectErr.Code())
+				if tt.wantPath != "" {
+					details := connectErr.Details()
+					require.Len(t, details, 1)
+					detail, err := details[0].Value()
+					require.NoError(t, err)
+					violations, ok := detail.(*validatepb.Violations)
+					require.True(t, ok)
+					require.Len(t, violations.Violations, 1)
+					require.Equal(t, tt.wantPath, violations.Violations[0].FieldPath)
+				}
+			} else {
+				require.NoError(t, err)
+				got, receiveErr := stream.Receive()
+				if tt.wantReceiveCode > 0 {
+					require.Equal(t, connect.CodeOf(receiveErr), tt.wantReceiveCode)
+				} else {
+					require.NoError(t, receiveErr)
+					require.NotZero(t, got.Sum)
+				}
+			}
+		})
+	}
+}
+
+func TestWithValidator(t *testing.T) {
+	t.Parallel()
+	validator, err := protovalidate.New(protovalidate.WithDisableLazy(true))
+	require.NoError(t, err)
+	interceptor, err := validate.NewInterceptor(validate.WithValidator(validator))
+	require.NoError(t, err)
+
+	mux := http.NewServeMux()
+	mux.Handle(userv1connect.UserServiceCreateUserProcedure, connect.NewUnaryHandler(
+		userv1connect.UserServiceCreateUserProcedure,
+		createUser,
+		connect.WithInterceptors(interceptor),
+	))
+	srv := startHTTPServer(t, mux)
+
+	req := connect.NewRequest(&userv1.CreateUserRequest{
+		User: &userv1.User{Email: "someone@example.com"},
 	})
-	t.Run("success with validator", func(t *testing.T) {
-		t.Parallel()
-		validator, err := protovalidate.New()
-		require.NoError(t, err)
-		interceptor, err := validate.NewInterceptor(validate.WithValidator(validator))
-		require.NoError(t, err)
-		assert.NotNil(t, interceptor)
-	})
+	_, err = userv1connect.NewUserServiceClient(srv.Client(), srv.URL).
+		CreateUser(context.Background(), req)
+	require.Error(t, err)
+	require.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 }
 
-func TestInterceptor_WrapUnary(t *testing.T) {
-	t.Parallel()
-	type args struct {
-		msg    string
-		code   connect.Code
-		detail *protovalidate.ValidationError
-	}
-	tests := []struct {
-		name    string
-		svc     pingv1connect.PingServiceHandler
-		req     *pingv1.PingRequest
-		want    *pingv1.PingResponse
-		wantErr *args
-	}{
-		{
-			name: "empty request returns error on required request fields",
-			req:  &pingv1.PingRequest{},
-			wantErr: &args{
-				msg:  "validation error:\n - number: value is required [required]",
-				code: connect.CodeInvalidArgument,
-				detail: &protovalidate.ValidationError{
-					Violations: []*validateproto.Violation{
-						{
-							FieldPath:    "number",
-							ConstraintId: "required",
-							Message:      "value is required",
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "invalid request returns error with constraint violation",
-			req: &pingv1.PingRequest{
-				Number: 123,
-			},
-			wantErr: &args{
-				msg:  "validation error:\n - number: value must be greater than 0 and less than 100 [int64.gt_lt]",
-				code: connect.CodeInvalidArgument,
-				detail: &protovalidate.ValidationError{
-					Violations: []*validateproto.Violation{
-						{
-							FieldPath:    "number",
-							ConstraintId: "int64.gt_lt",
-							Message:      "value must be greater than 0 and less than 100",
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "unrelated server error remains unaffected",
-			svc: testserver.NewPingServer(
-				testserver.WithErr(
-					connect.NewError(connect.CodeInternal, fmt.Errorf("oh no")),
-				),
-			),
-			req: &pingv1.PingRequest{
-				Number: 50,
-			},
-			wantErr: &args{
-				msg:  "oh no",
-				code: connect.CodeInternal,
-			},
-		},
-		{
-			name: "valid request returns response",
-			req: &pingv1.PingRequest{
-				Number: 50,
-			},
-			want: &pingv1.PingResponse{
-				Number: 50,
-			},
-		},
-	}
-	for _, tt := range tests {
-		test := tt
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			if test.svc == nil {
-				test.svc = testserver.NewPingServer()
-			}
-
-			validator, err := validate.NewInterceptor()
-			require.NoError(t, err)
-
-			mux := http.NewServeMux()
-			mux.Handle(pingv1connect.NewPingServiceHandler(
-				test.svc,
-				connect.WithInterceptors(validator),
-			))
-
-			exampleBookingServer := testserver.NewInMemoryServer(mux)
-			defer exampleBookingServer.Close()
-
-			client := pingv1connect.NewPingServiceClient(
-				exampleBookingServer.Client(),
-				exampleBookingServer.URL(),
-			)
-
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-			defer cancel()
-
-			got, err := client.Ping(ctx, connect.NewRequest(test.req))
-			if test.wantErr != nil {
-				require.Error(t, err)
-				var connectErr *connect.Error
-				assert.True(t, errors.As(err, &connectErr))
-				assert.Equal(t, test.wantErr.msg, connectErr.Message())
-				assert.Equal(t, test.wantErr.code, connectErr.Code())
-				if test.wantErr.detail != nil {
-					require.Len(t, connectErr.Details(), 1)
-					detail, err := connect.NewErrorDetail(test.wantErr.detail.ToProto())
-					require.NoError(t, err)
-					assert.Equal(t, connectErr.Details()[0].Type(), detail.Type())
-				}
-				assert.Nil(t, got)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, test.want.GetNumber(), got.Msg.GetNumber())
-			}
-		})
-	}
+func startHTTPServer(tb testing.TB, h http.Handler) *httptest.Server {
+	tb.Helper()
+	srv := httptest.NewUnstartedServer(h)
+	srv.EnableHTTP2 = true
+	srv.Start()
+	tb.Cleanup(srv.Close)
+	return srv
 }
 
-func TestInterceptor_WrapStreamingClient(t *testing.T) {
-	t.Parallel()
-	type args struct {
-		msg      string
-		code     connect.Code
-		detail   *protovalidate.ValidationError
-		closeErr bool
-	}
-	tests := []struct {
-		name    string
-		svc     pingv1connect.PingServiceHandler
-		req     *pingv1.SumRequest
-		want    *pingv1.SumResponse
-		wantErr *args
-	}{
-		{
-			name: "empty request returns error on required request fields",
-			req:  &pingv1.SumRequest{},
-			wantErr: &args{
-				msg:  "validation error:\n - number: value is required [required]",
-				code: connect.CodeInvalidArgument,
-				detail: &protovalidate.ValidationError{
-					Violations: []*validateproto.Violation{
-						{
-							FieldPath:    "number",
-							ConstraintId: "required",
-							Message:      "value is required",
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "invalid request returns error with constraint violation",
-			req: &pingv1.SumRequest{
-				Number: 123,
-			},
-			wantErr: &args{
-				msg:  "validation error:\n - number: value must be greater than 0 and less than 100 [int64.gt_lt]",
-				code: connect.CodeInvalidArgument,
-				detail: &protovalidate.ValidationError{
-					Violations: []*validateproto.Violation{
-						{
-							FieldPath:    "number",
-							ConstraintId: "int64.gt_lt",
-							Message:      "value must be greater than 0 and less than 100",
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "unrelated server error remains unaffected",
-			svc: testserver.NewPingServer(
-				testserver.WithErr(
-					connect.NewError(connect.CodeInternal, fmt.Errorf("oh no")),
-				),
-			),
-			req: &pingv1.SumRequest{
-				Number: 50,
-			},
-			wantErr: &args{
-				msg:      "oh no",
-				code:     connect.CodeInternal,
-				closeErr: true,
-			},
-		},
-		{
-			name: "valid request returns response",
-			req: &pingv1.SumRequest{
-				Number: 50,
-			},
-			want: &pingv1.SumResponse{
-				Sum: 50,
-			},
-		},
-	}
-	for _, tt := range tests {
-		test := tt
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			if test.svc == nil {
-				test.svc = testserver.NewPingServer()
-			}
-
-			validator, err := validate.NewInterceptor()
-			require.NoError(t, err)
-
-			mux := http.NewServeMux()
-			mux.Handle(pingv1connect.NewPingServiceHandler(
-				test.svc,
-			))
-
-			exampleBookingServer := testserver.NewInMemoryServer(mux)
-			defer exampleBookingServer.Close()
-
-			client := pingv1connect.NewPingServiceClient(
-				exampleBookingServer.Client(),
-				exampleBookingServer.URL(),
-				connect.WithInterceptors(validator),
-			)
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			stream := client.Sum(ctx)
-			err = stream.Send(test.req)
-			resp, closeErr := stream.CloseAndReceive()
-			if test.wantErr != nil {
-				if test.wantErr.closeErr {
-					err = closeErr
-				}
-				require.Error(t, err)
-				var connectErr *connect.Error
-				assert.True(t, errors.As(err, &connectErr))
-				assert.Equal(t, test.wantErr.msg, connectErr.Message())
-				assert.Equal(t, test.wantErr.code, connectErr.Code())
-				if test.wantErr.detail != nil {
-					require.Len(t, connectErr.Details(), 1)
-					detail, err := connect.NewErrorDetail(test.wantErr.detail.ToProto())
-					require.NoError(t, err)
-					assert.Equal(t, connectErr.Details()[0].Type(), detail.Type())
-				}
-			} else {
-				require.NoError(t, err)
-				require.NoError(t, err)
-				assert.NotNil(t, resp)
-				assert.Equal(t, resp.Msg.GetSum(), test.want.GetSum())
-			}
-		})
-	}
+func createUser(_ context.Context, req *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error) {
+	return connect.NewResponse(&userv1.CreateUserResponse{User: req.Msg.User}), nil
 }
 
-func TestInterceptor_WrapStreamingHandler(t *testing.T) {
-	t.Parallel()
-	type args struct {
-		msg      string
-		code     connect.Code
-		detail   *protovalidate.ValidationError
-		closeErr bool
+func cumSumSuccess(_ context.Context, stream *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error {
+	var sum int64
+	for {
+		req, err := stream.Receive()
+		if errors.Is(err, io.EOF) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		sum += req.Number
+		if err := stream.Send(&calculatorv1.CumSumResponse{Sum: sum}); err != nil {
+			return err
+		}
 	}
-	tests := []struct {
-		name    string
-		svc     pingv1connect.PingServiceHandler
-		req     *pingv1.CountUpRequest
-		want    *pingv1.CountUpResponse
-		wantErr *args
-	}{
-		{
-			name: "empty request returns error on required request fields",
-			req:  &pingv1.CountUpRequest{},
-			wantErr: &args{
-				msg:  "validation error:\n - number: value is required [required]",
-				code: connect.CodeInvalidArgument,
-				detail: &protovalidate.ValidationError{
-					Violations: []*validateproto.Violation{
-						{
-							FieldPath:    "number",
-							ConstraintId: "required",
-							Message:      "value is required",
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "invalid request returns error with constraint violation",
-			req: &pingv1.CountUpRequest{
-				Number: 123,
-			},
-			wantErr: &args{
-				msg:  "validation error:\n - number: value must be greater than 0 and less than 100 [int64.gt_lt]",
-				code: connect.CodeInvalidArgument,
-				detail: &protovalidate.ValidationError{
-					Violations: []*validateproto.Violation{
-						{
-							FieldPath:    "number",
-							ConstraintId: "int64.gt_lt",
-							Message:      "value must be greater than 0 and less than 100",
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "unrelated server error remains unaffected",
-			svc: testserver.NewPingServer(
-				testserver.WithErr(
-					connect.NewError(connect.CodeInternal, fmt.Errorf("oh no")),
-				),
-			),
-			req: &pingv1.CountUpRequest{
-				Number: 50,
-			},
-			wantErr: &args{
-				msg:      "oh no",
-				code:     connect.CodeInternal,
-				closeErr: true,
-			},
-		},
-		{
-			name: "valid request returns response",
-			req: &pingv1.CountUpRequest{
-				Number: 50,
-			},
-			want: &pingv1.CountUpResponse{
-				Number: 1,
-			},
-		},
-	}
-	for _, tt := range tests {
-		test := tt
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
+	return nil
+}
 
-			if test.svc == nil {
-				test.svc = testserver.NewPingServer()
-			}
-			validator, err := validate.NewInterceptor()
-			require.NoError(t, err)
-			mux := http.NewServeMux()
-			mux.Handle(pingv1connect.NewPingServiceHandler(
-				test.svc,
-				connect.WithInterceptors(validator),
-			))
-
-			exampleBookingServer := testserver.NewInMemoryServer(mux)
-			defer exampleBookingServer.Close()
-
-			client := pingv1connect.NewPingServiceClient(
-				exampleBookingServer.Client(),
-				exampleBookingServer.URL(),
-			)
-
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			stream, err := client.CountUp(ctx, connect.NewRequest(test.req))
-			require.NoError(t, err)
-			receive := stream.Receive()
-			got := stream.Msg()
-			err = stream.Err()
-			if test.wantErr != nil {
-				require.Error(t, err)
-				var connectErr *connect.Error
-				assert.True(t, errors.As(err, &connectErr))
-				assert.Equal(t, test.wantErr.msg, connectErr.Message())
-				assert.Equal(t, test.wantErr.code, connectErr.Code())
-				if test.wantErr.detail != nil {
-					require.Len(t, connectErr.Details(), 1)
-					detail, err := connect.NewErrorDetail(test.wantErr.detail.ToProto())
-					require.NoError(t, err)
-					assert.Equal(t, connectErr.Details()[0].Type(), detail.Type())
-				}
-			} else {
-				require.NoError(t, err)
-				assert.True(t, receive)
-				assert.NotNil(t, got)
-				assert.Equal(t, test.want.GetNumber(), got.GetNumber())
-			}
-		})
-	}
+func cumSumError(_ context.Context, stream *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error {
+	return connect.NewError(connect.CodeInternal, errors.New("boom"))
 }
