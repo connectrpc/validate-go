@@ -134,6 +134,10 @@ schema](internal/proto/example/user/v1/user.proto) with constraints,
 [buf.yaml](internal/proto/buf.yaml) and [buf.gen.yaml](buf.gen.yaml)
 configuration files, and `make generate` [recipe](Makefile).
 
+### Does the interceptor validate responses?
+
+No. On both clients and servers, the interceptor only validates requests.
+
 ## Ecosystem
 
 * [connect-go]: the Connect runtime
