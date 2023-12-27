@@ -137,7 +137,6 @@ configuration files, and `make generate` [recipe](Makefile).
 ### Does the interceptor validate responses?
 
 No. On both clients and servers, the interceptor only validates requests.
-outgoing responses.
 
 ## Ecosystem
 
