@@ -61,7 +61,7 @@ func TestInterceptorUnary(t *testing.T) {
 		},
 		{
 			name: "underlying_error",
-			svc: func(_ context.Context, req *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error) {
+			svc: func(_ context.Context, _ *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error) {
 				return nil, connect.NewError(connect.CodeInternal, errors.New("oh no"))
 			},
 			req: &userv1.CreateUserRequest{
@@ -92,7 +92,7 @@ func TestInterceptorUnary(t *testing.T) {
 			if test.wantCode > 0 {
 				require.Error(t, err)
 				var connectErr *connect.Error
-				require.True(t, errors.As(err, &connectErr))
+				require.ErrorAs(t, err, &connectErr)
 				assert.Equal(t, test.wantCode, connectErr.Code())
 				if test.wantPath != "" {
 					details := connectErr.Details()
@@ -178,7 +178,7 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 			if test.wantCode > 0 {
 				require.Error(t, err)
 				var connectErr *connect.Error
-				assert.True(t, errors.As(err, &connectErr))
+				require.ErrorAs(t, err, &connectErr)
 				assert.Equal(t, test.wantCode, connectErr.Code())
 				if test.wantPath != "" {
 					details := connectErr.Details()
@@ -264,7 +264,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 			if test.wantCode > 0 {
 				require.Error(t, err)
 				var connectErr *connect.Error
-				assert.True(t, errors.As(err, &connectErr))
+				require.ErrorAs(t, err, &connectErr)
 				t.Log(connectErr)
 				assert.Equal(t, test.wantCode, connectErr.Code())
 				if test.wantPath != "" {
@@ -281,7 +281,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 				require.NoError(t, err)
 				got, receiveErr := stream.Receive()
 				if test.wantReceiveCode > 0 {
-					require.Equal(t, connect.CodeOf(receiveErr), test.wantReceiveCode)
+					require.Equal(t, test.wantReceiveCode, connect.CodeOf(receiveErr))
 				} else {
 					require.NoError(t, receiveErr)
 					require.NotZero(t, got.Sum)
