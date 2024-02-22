@@ -9,7 +9,7 @@ MAKEFLAGS += --no-print-directory
 BIN := .tmp/bin
 export PATH := $(BIN):$(PATH)
 export GOBIN := $(abspath $(BIN))
-COPYRIGHT_YEARS := 2023
+COPYRIGHT_YEARS := 2023-2024
 LICENSE_IGNORE := --ignore testdata/
 
 .PHONY: help
@@ -70,11 +70,11 @@ checkgenerate:
 
 $(BIN)/buf: Makefile
 	@mkdir -p $(@D)
-	go install github.com/bufbuild/buf/cmd/buf@v1.26.1
+	go install github.com/bufbuild/buf/cmd/buf@v1.29.0
 
 $(BIN)/license-header: Makefile
 	@mkdir -p $(@D)
-	go install github.com/bufbuild/buf/private/pkg/licenseheader/cmd/license-header@v1.26.1
+	go install github.com/bufbuild/buf/private/pkg/licenseheader/cmd/license-header@v1.29.0
 
 $(BIN)/golangci-lint: Makefile
 	@mkdir -p $(@D)
