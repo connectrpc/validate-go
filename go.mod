@@ -2,8 +2,6 @@ module connectrpc.com/validate
 
 go 1.21.0
 
-toolchain go1.23.2
-
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.35.1-20240920164238-5a7b106cbb87.1
 	connectrpc.com/connect v1.17.0
