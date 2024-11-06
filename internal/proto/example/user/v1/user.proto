@@ -25,8 +25,8 @@ message User {
   google.protobuf.Timestamp signup_date = 3;
 
   option (buf.validate.message).cel = {
-    id: "user.signup_date",
-    message: "signup date must be on or after birth date",
+    id: "user.signup_date"
+    message: "signup date must be on or after birth date"
     expression: "this.signup_date >= this.birth_date"
   };
 }

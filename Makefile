@@ -70,15 +70,15 @@ checkgenerate:
 
 $(BIN)/buf: Makefile
 	@mkdir -p $(@D)
-	go install github.com/bufbuild/buf/cmd/buf@v1.29.0
+	go install github.com/bufbuild/buf/cmd/buf@v1.46.0
 
 $(BIN)/license-header: Makefile
 	@mkdir -p $(@D)
-	go install github.com/bufbuild/buf/private/pkg/licenseheader/cmd/license-header@v1.29.0
+	go install github.com/bufbuild/buf/private/pkg/licenseheader/cmd/license-header@v1.46.0
 
 $(BIN)/golangci-lint: Makefile
 	@mkdir -p $(@D)
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.56.2
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
 
 $(BIN)/protoc-gen-connect-go: Makefile go.mod
 	@mkdir -p $(@D)

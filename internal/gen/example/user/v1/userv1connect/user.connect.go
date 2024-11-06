@@ -32,7 +32,7 @@ import (
 // generated with a version of connect newer than the one compiled into your binary. You can fix the
 // problem by either regenerating this code with an older version of connect or updating the connect
 // version compiled into your binary.
-const _ = connect.IsAtLeastVersion0_1_0
+const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// UserServiceName is the fully-qualified name of the UserService service.
@@ -49,6 +49,12 @@ const (
 const (
 	// UserServiceCreateUserProcedure is the fully-qualified name of the UserService's CreateUser RPC.
 	UserServiceCreateUserProcedure = "/example.user.v1.UserService/CreateUser"
+)
+
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	userServiceServiceDescriptor          = v1.File_example_user_v1_user_proto.Services().ByName("UserService")
+	userServiceCreateUserMethodDescriptor = userServiceServiceDescriptor.Methods().ByName("CreateUser")
 )
 
 // UserServiceClient is a client for the example.user.v1.UserService service.
@@ -69,7 +75,8 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 		createUser: connect.NewClient[v1.CreateUserRequest, v1.CreateUserResponse](
 			httpClient,
 			baseURL+UserServiceCreateUserProcedure,
-			opts...,
+			connect.WithSchema(userServiceCreateUserMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 	}
 }
@@ -98,7 +105,8 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 	userServiceCreateUserHandler := connect.NewUnaryHandler(
 		UserServiceCreateUserProcedure,
 		svc.CreateUser,
-		opts...,
+		connect.WithSchema(userServiceCreateUserMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	return "/example.user.v1.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
