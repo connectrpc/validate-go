@@ -32,7 +32,7 @@ import (
 // generated with a version of connect newer than the one compiled into your binary. You can fix the
 // problem by either regenerating this code with an older version of connect or updating the connect
 // version compiled into your binary.
-const _ = connect.IsAtLeastVersion0_1_0
+const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// CalculatorServiceName is the fully-qualified name of the CalculatorService service.
@@ -50,6 +50,12 @@ const (
 	// CalculatorServiceCumSumProcedure is the fully-qualified name of the CalculatorService's CumSum
 	// RPC.
 	CalculatorServiceCumSumProcedure = "/example.calculator.v1.CalculatorService/CumSum"
+)
+
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	calculatorServiceServiceDescriptor      = v1.File_example_calculator_v1_calculator_proto.Services().ByName("CalculatorService")
+	calculatorServiceCumSumMethodDescriptor = calculatorServiceServiceDescriptor.Methods().ByName("CumSum")
 )
 
 // CalculatorServiceClient is a client for the example.calculator.v1.CalculatorService service.
@@ -70,7 +76,8 @@ func NewCalculatorServiceClient(httpClient connect.HTTPClient, baseURL string, o
 		cumSum: connect.NewClient[v1.CumSumRequest, v1.CumSumResponse](
 			httpClient,
 			baseURL+CalculatorServiceCumSumProcedure,
-			opts...,
+			connect.WithSchema(calculatorServiceCumSumMethodDescriptor),
+			connect.WithClientOptions(opts...),
 		),
 	}
 }
@@ -100,7 +107,8 @@ func NewCalculatorServiceHandler(svc CalculatorServiceHandler, opts ...connect.H
 	calculatorServiceCumSumHandler := connect.NewBidiStreamHandler(
 		CalculatorServiceCumSumProcedure,
 		svc.CumSum,
-		opts...,
+		connect.WithSchema(calculatorServiceCumSumMethodDescriptor),
+		connect.WithHandlerOptions(opts...),
 	)
 	return "/example.calculator.v1.CalculatorService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

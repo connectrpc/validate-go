@@ -102,7 +102,7 @@ func TestInterceptorUnary(t *testing.T) {
 					violations, ok := detail.(*validatepb.Violations)
 					require.True(t, ok)
 					require.Len(t, violations.Violations, 1)
-					require.Equal(t, test.wantPath, violations.Violations[0].FieldPath)
+					require.Equal(t, test.wantPath, violations.Violations[0].GetFieldPath())
 				}
 			} else {
 				require.NoError(t, err)
@@ -188,7 +188,7 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 					violations, ok := detail.(*validatepb.Violations)
 					require.True(t, ok)
 					require.Len(t, violations.Violations, 1)
-					require.Equal(t, test.wantPath, violations.Violations[0].FieldPath)
+					require.Equal(t, test.wantPath, violations.Violations[0].GetFieldPath())
 				}
 			} else {
 				require.NoError(t, err)
@@ -275,7 +275,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 					violations, ok := detail.(*validatepb.Violations)
 					require.True(t, ok)
 					require.Len(t, violations.Violations, 1)
-					require.Equal(t, test.wantPath, violations.Violations[0].FieldPath)
+					require.Equal(t, test.wantPath, violations.Violations[0].GetFieldPath())
 				}
 			} else {
 				require.NoError(t, err)
