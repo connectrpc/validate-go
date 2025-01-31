@@ -20,6 +20,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,7 +103,7 @@ func TestInterceptorUnary(t *testing.T) {
 					violations, ok := detail.(*validatepb.Violations)
 					require.True(t, ok)
 					require.Len(t, violations.Violations, 1)
-					require.Equal(t, test.wantPath, violations.Violations[0].GetFieldPath())
+					require.Equal(t, test.wantPath, fieldPath(violations.Violations[0].GetField()))
 				}
 			} else {
 				require.NoError(t, err)
@@ -188,7 +189,7 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 					violations, ok := detail.(*validatepb.Violations)
 					require.True(t, ok)
 					require.Len(t, violations.Violations, 1)
-					require.Equal(t, test.wantPath, violations.Violations[0].GetFieldPath())
+					require.Equal(t, test.wantPath, fieldPath(violations.Violations[0].GetField()))
 				}
 			} else {
 				require.NoError(t, err)
@@ -275,7 +276,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 					violations, ok := detail.(*validatepb.Violations)
 					require.True(t, ok)
 					require.Len(t, violations.Violations, 1)
-					require.Equal(t, test.wantPath, violations.Violations[0].GetFieldPath())
+					require.Equal(t, test.wantPath, fieldPath(violations.Violations[0].GetField()))
 				}
 			} else {
 				require.NoError(t, err)
@@ -293,7 +294,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 
 func TestWithValidator(t *testing.T) {
 	t.Parallel()
-	validator, err := protovalidate.New(protovalidate.WithDisableLazy(true))
+	validator, err := protovalidate.New(protovalidate.WithDisableLazy())
 	require.NoError(t, err)
 	interceptor, err := validate.NewInterceptor(validate.WithValidator(validator))
 	require.NoError(t, err)
@@ -346,4 +347,12 @@ func cumSumSuccess(_ context.Context, stream *connect.BidiStream[calculatorv1.Cu
 
 func cumSumError(_ context.Context, _ *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error {
 	return connect.NewError(connect.CodeInternal, errors.New("boom"))
+}
+
+func fieldPath(field *validatepb.FieldPath) string {
+	elements := make([]string, len(field.GetElements()))
+	for i, element := range field.GetElements() {
+		elements[i] = element.GetFieldName()
+	}
+	return strings.Join(elements, ".")
 }
