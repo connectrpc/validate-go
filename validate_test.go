@@ -102,7 +102,7 @@ func TestInterceptorUnary(t *testing.T) {
 					violations, ok := detail.(*validatepb.Violations)
 					require.True(t, ok)
 					require.Len(t, violations.Violations, 1)
-					require.Equal(t, test.wantPath, violations.Violations[0].GetFieldPath())
+					require.Equal(t, test.wantPath, protovalidate.FieldPathString(violations.Violations[0].GetField()))
 				}
 			} else {
 				require.NoError(t, err)
@@ -188,7 +188,7 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 					violations, ok := detail.(*validatepb.Violations)
 					require.True(t, ok)
 					require.Len(t, violations.Violations, 1)
-					require.Equal(t, test.wantPath, violations.Violations[0].GetFieldPath())
+					require.Equal(t, test.wantPath, protovalidate.FieldPathString(violations.Violations[0].GetField()))
 				}
 			} else {
 				require.NoError(t, err)
@@ -275,7 +275,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 					violations, ok := detail.(*validatepb.Violations)
 					require.True(t, ok)
 					require.Len(t, violations.Violations, 1)
-					require.Equal(t, test.wantPath, violations.Violations[0].GetFieldPath())
+					require.Equal(t, test.wantPath, protovalidate.FieldPathString(violations.Violations[0].GetField()))
 				}
 			} else {
 				require.NoError(t, err)
@@ -293,7 +293,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 
 func TestWithValidator(t *testing.T) {
 	t.Parallel()
-	validator, err := protovalidate.New(protovalidate.WithDisableLazy(true))
+	validator, err := protovalidate.New(protovalidate.WithDisableLazy())
 	require.NoError(t, err)
 	interceptor, err := validate.NewInterceptor(validate.WithValidator(validator))
 	require.NoError(t, err)
