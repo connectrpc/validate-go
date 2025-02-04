@@ -1,0 +1,12 @@
+version: v2
+modules:
+  - path: internal/proto
+deps:
+  - buf.build/bufbuild/protovalidate
+lint:
+  use:
+    - STANDARD
+  disallow_comment_ignores: true
+breaking:
+  use:
+    - FILE

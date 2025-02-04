@@ -1,4 +1,4 @@
-// Copyright 2023-2024 The Connect Authors
+// Copyright 2023-2025 The Connect Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,12 +52,6 @@ const (
 	CalculatorServiceCumSumProcedure = "/example.calculator.v1.CalculatorService/CumSum"
 )
 
-// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
-var (
-	calculatorServiceServiceDescriptor      = v1.File_example_calculator_v1_calculator_proto.Services().ByName("CalculatorService")
-	calculatorServiceCumSumMethodDescriptor = calculatorServiceServiceDescriptor.Methods().ByName("CumSum")
-)
-
 // CalculatorServiceClient is a client for the example.calculator.v1.CalculatorService service.
 type CalculatorServiceClient interface {
 	CumSum(context.Context) *connect.BidiStreamForClient[v1.CumSumRequest, v1.CumSumResponse]
@@ -72,11 +66,12 @@ type CalculatorServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewCalculatorServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) CalculatorServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	calculatorServiceMethods := v1.File_example_calculator_v1_calculator_proto.Services().ByName("CalculatorService").Methods()
 	return &calculatorServiceClient{
 		cumSum: connect.NewClient[v1.CumSumRequest, v1.CumSumResponse](
 			httpClient,
 			baseURL+CalculatorServiceCumSumProcedure,
-			connect.WithSchema(calculatorServiceCumSumMethodDescriptor),
+			connect.WithSchema(calculatorServiceMethods.ByName("CumSum")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -104,10 +99,11 @@ type CalculatorServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewCalculatorServiceHandler(svc CalculatorServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	calculatorServiceMethods := v1.File_example_calculator_v1_calculator_proto.Services().ByName("CalculatorService").Methods()
 	calculatorServiceCumSumHandler := connect.NewBidiStreamHandler(
 		CalculatorServiceCumSumProcedure,
 		svc.CumSum,
-		connect.WithSchema(calculatorServiceCumSumMethodDescriptor),
+		connect.WithSchema(calculatorServiceMethods.ByName("CumSum")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/example.calculator.v1.CalculatorService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
