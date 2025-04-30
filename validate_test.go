@@ -24,13 +24,13 @@ import (
 	"time"
 
 	validatepb "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
+	"buf.build/go/protovalidate"
 	"connectrpc.com/connect"
 	"connectrpc.com/validate"
 	calculatorv1 "connectrpc.com/validate/internal/gen/example/calculator/v1"
 	"connectrpc.com/validate/internal/gen/example/calculator/v1/calculatorv1connect"
 	userv1 "connectrpc.com/validate/internal/gen/example/user/v1"
 	"connectrpc.com/validate/internal/gen/example/user/v1/userv1connect"
-	"github.com/bufbuild/protovalidate-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -71,7 +71,6 @@ func TestInterceptorUnary(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -141,7 +140,6 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -228,7 +226,6 @@ func TestInterceptorStreamingClient(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
