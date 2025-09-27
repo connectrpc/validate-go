@@ -113,17 +113,15 @@ func NewInterceptor(opts ...Option) *Interceptor {
 // WrapUnary implements connect.Interceptor.
 func (i *Interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		if err := i.validate(req.Any()); err != nil {
+		if err := i.validateRequest(req.Any()); err != nil {
 			return nil, err
 		}
 		response, err := next(ctx, req)
 		if err != nil {
 			return response, err
 		}
-		if i.validateResponses {
-			if err := i.validate(response.Any()); err != nil {
-				return response, err
-			}
+		if err := i.validateResponse(response.Any()); err != nil {
+			return response, err
 		}
 		return response, nil
 	}
@@ -149,7 +147,18 @@ func (i *Interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) co
 	}
 }
 
-func (i *Interceptor) validate(msg any) error {
+func (i *Interceptor) validateRequest(msg any) error {
+	return i.validate(msg, connect.CodeInvalidArgument)
+}
+
+func (i *Interceptor) validateResponse(msg any) error {
+	if !i.validateResponses {
+		return nil
+	}
+	return i.validate(msg, connect.CodeInternal)
+}
+
+func (i *Interceptor) validate(msg any, code connect.Code) error {
 	if msg == nil {
 		return nil
 	}
@@ -161,7 +170,7 @@ func (i *Interceptor) validate(msg any) error {
 	if err == nil {
 		return nil
 	}
-	connectErr := connect.NewError(connect.CodeInvalidArgument, err)
+	connectErr := connect.NewError(code, err)
 	if !i.noErrorDetails {
 		if validationErr := new(protovalidate.ValidationError); errors.As(err, &validationErr) {
 			if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
@@ -179,7 +188,7 @@ type streamingClientInterceptor struct {
 }
 
 func (s *streamingClientInterceptor) Send(msg any) error {
-	if err := s.interceptor.validate(msg); err != nil {
+	if err := s.interceptor.validateRequest(msg); err != nil {
 		return err
 	}
 	return s.StreamingClientConn.Send(msg)
@@ -189,10 +198,7 @@ func (s *streamingClientInterceptor) Receive(msg any) error {
 	if err := s.StreamingClientConn.Receive(msg); err != nil {
 		return err
 	}
-	if s.interceptor.validateResponses {
-		return s.interceptor.validate(msg)
-	}
-	return nil
+	return s.interceptor.validateResponse(msg)
 }
 
 type streamingHandlerInterceptor struct {
@@ -202,10 +208,8 @@ type streamingHandlerInterceptor struct {
 }
 
 func (s *streamingHandlerInterceptor) Send(msg any) error {
-	if s.interceptor.validateResponses {
-		if err := s.interceptor.validate(msg); err != nil {
-			return err
-		}
+	if err := s.interceptor.validateResponse(msg); err != nil {
+		return err
 	}
 	return s.StreamingHandlerConn.Send(msg)
 }
@@ -214,7 +218,7 @@ func (s *streamingHandlerInterceptor) Receive(msg any) error {
 	if err := s.StreamingHandlerConn.Receive(msg); err != nil {
 		return err
 	}
-	return s.interceptor.validate(msg)
+	return s.interceptor.validateRequest(msg)
 }
 
 type optionFunc func(*Interceptor)
