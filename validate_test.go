@@ -88,8 +88,7 @@ func TestInterceptorUnary(t *testing.T) {
 			if test.validateResponses {
 				opts = append(opts, validate.WithValidateResponses())
 			}
-			validator, err := validate.NewInterceptor(opts...)
-			require.NoError(t, err)
+			validator := validate.NewInterceptor(opts...)
 
 			mux := http.NewServeMux()
 			mux.Handle(userv1connect.UserServiceCreateUserProcedure, connect.NewUnaryHandler(
@@ -169,8 +168,7 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 			if test.validateResponses {
 				opts = append(opts, validate.WithValidateResponses())
 			}
-			validator, err := validate.NewInterceptor(opts...)
-			require.NoError(t, err)
+			validator := validate.NewInterceptor(opts...)
 
 			mux := http.NewServeMux()
 			mux.Handle(calculatorv1connect.CalculatorServiceCumSumProcedure, connect.NewBidiStreamHandler(
@@ -194,7 +192,7 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 				assert.NoError(t, stream.CloseRequest())
 			})
 
-			err = stream.Send(test.req)
+			err := stream.Send(test.req)
 			require.NoError(t, err)
 			time.Sleep(time.Second)
 			got, err := stream.Receive()
@@ -267,8 +265,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 			if test.validateResponses {
 				opts = append(opts, validate.WithValidateResponses())
 			}
-			validator, err := validate.NewInterceptor(opts...)
-			require.NoError(t, err)
+			validator := validate.NewInterceptor(opts...)
 
 			mux := http.NewServeMux()
 			mux.Handle(calculatorv1connect.CalculatorServiceCumSumProcedure, connect.NewBidiStreamHandler(
@@ -295,7 +292,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 				assert.NoError(t, stream.CloseRequest())
 			})
 
-			err = stream.Send(test.req)
+			err := stream.Send(test.req)
 			if test.wantCode > 0 {
 				require.Error(t, err)
 				var connectErr *connect.Error
@@ -330,7 +327,7 @@ func TestWithValidator(t *testing.T) {
 	t.Parallel()
 	validator, err := protovalidate.New(protovalidate.WithDisableLazy())
 	require.NoError(t, err)
-	interceptor, err := validate.NewInterceptor(validate.WithValidator(validator))
+	interceptor := validate.NewInterceptor(validate.WithValidator(validator))
 	require.NoError(t, err)
 
 	mux := http.NewServeMux()

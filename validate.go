@@ -35,8 +35,9 @@ type Option interface {
 }
 
 // WithValidator configures the [Interceptor] to use a customized
-// [protovalidate.Validator]. See [protovalidate.ValidatorOption] for the range
-// of available customizations.
+// [protovalidate.Validator]. By default, [protovalidate.GlobalInterceptor]
+// is used See [protovalidate.ValidatorOption] for the range of available
+// customizations.
 func WithValidator(validator protovalidate.Validator) Option {
 	return optionFunc(func(i *Interceptor) {
 		i.validator = validator
@@ -86,21 +87,17 @@ type Interceptor struct {
 
 // NewInterceptor builds an Interceptor. The default configuration is
 // appropriate for most use cases.
-func NewInterceptor(opts ...Option) (*Interceptor, error) {
+func NewInterceptor(opts ...Option) *Interceptor {
 	var interceptor Interceptor
 	for _, opt := range opts {
 		opt.apply(&interceptor)
 	}
 
 	if interceptor.validator == nil {
-		validator, err := protovalidate.New()
-		if err != nil {
-			return nil, fmt.Errorf("construct validator: %w", err)
-		}
-		interceptor.validator = validator
+		interceptor.validator = protovalidate.GlobalValidator
 	}
 
-	return &interceptor, nil
+	return &interceptor
 }
 
 // WrapUnary implements connect.Interceptor.

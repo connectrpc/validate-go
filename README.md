@@ -90,15 +90,10 @@ import (
 )
 
 func main() {
-	interceptor, err := validate.NewInterceptor()
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	mux := http.NewServeMux()
 	mux.Handle(userv1connect.NewUserServiceHandler(
 		&userv1connect.UnimplementedUserServiceHandler{},
-		connect.WithInterceptors(interceptor),
+		connect.WithInterceptors(validate.NewInterceptor()),
 	))
 
 	http.ListenAndServe("localhost:8080", mux)
