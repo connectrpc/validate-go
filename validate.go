@@ -43,9 +43,26 @@ func WithValidator(validator protovalidate.Validator) Option {
 	})
 }
 
+// WithValidateResponses configures the [Interceptor] to also validate reponses
+// in addition to validating requests.
+//
+// By default:
+//
+// - Unary: Response messages from the server are not validated.
+// - Client streams: Received messages are not validated.
+// - Server streams: Sent messages are not validated.
+//
+// However, these messages are all validated if this option is set.
+func WithValidateResponses() Option {
+	return optionFunc(func(i *Interceptor) {
+		i.validateResponses = true
+	})
+}
+
 // Interceptor is a [connect.Interceptor] that ensures that RPC request
 // messages match the constraints expressed in their Protobuf schemas. It does
-// not validate response messages.
+// not validate response messages unless the [WithValidateResponses] option
+// is specified.
 //
 // By default, Interceptors use a validator that lazily compiles constraints
 // and works with any Protobuf message. This is a simple, widely-applicable
@@ -63,7 +80,8 @@ func WithValidator(validator protovalidate.Validator) Option {
 //
 // [detailed representation of the error]: https://pkg.go.dev/buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate#Violations
 type Interceptor struct {
-	validator protovalidate.Validator
+	validator         protovalidate.Validator
+	validateResponses bool
 }
 
 // NewInterceptor builds an Interceptor. The default configuration is
@@ -91,7 +109,16 @@ func (i *Interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 		if err := validate(i.validator, req.Any()); err != nil {
 			return nil, err
 		}
-		return next(ctx, req)
+		response, err := next(ctx, req)
+		if err != nil {
+			return response, err
+		}
+		if i.validateResponses {
+			if err := validate(i.validator, response.Any()); err != nil {
+				return response, err
+			}
+		}
+		return response, nil
 	}
 }
 
@@ -100,7 +127,7 @@ func (i *Interceptor) WrapStreamingClient(next connect.StreamingClientFunc) conn
 	return func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
 		return &streamingClientInterceptor{
 			StreamingClientConn: next(ctx, spec),
-			validator:           i.validator,
+			interceptor:         i,
 		}
 	}
 }
@@ -110,7 +137,7 @@ func (i *Interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) co
 	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
 		return next(ctx, &streamingHandlerInterceptor{
 			StreamingHandlerConn: conn,
-			validator:            i.validator,
+			interceptor:          i,
 		})
 	}
 }
@@ -118,27 +145,46 @@ func (i *Interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) co
 type streamingClientInterceptor struct {
 	connect.StreamingClientConn
 
-	validator protovalidate.Validator
+	interceptor *Interceptor
 }
 
 func (s *streamingClientInterceptor) Send(msg any) error {
-	if err := validate(s.validator, msg); err != nil {
+	if err := validate(s.interceptor.validator, msg); err != nil {
 		return err
 	}
 	return s.StreamingClientConn.Send(msg)
 }
 
+func (s *streamingClientInterceptor) Receive(msg any) error {
+	if err := s.StreamingClientConn.Receive(msg); err != nil {
+		return err
+	}
+	if s.interceptor.validateResponses {
+		return validate(s.interceptor.validator, msg)
+	}
+	return nil
+}
+
 type streamingHandlerInterceptor struct {
 	connect.StreamingHandlerConn
 
-	validator protovalidate.Validator
+	interceptor *Interceptor
+}
+
+func (s *streamingHandlerInterceptor) Send(msg any) error {
+	if s.interceptor.validateResponses {
+		if err := validate(s.interceptor.validator, msg); err != nil {
+			return err
+		}
+	}
+	return s.StreamingHandlerConn.Send(msg)
 }
 
 func (s *streamingHandlerInterceptor) Receive(msg any) error {
 	if err := s.StreamingHandlerConn.Receive(msg); err != nil {
 		return err
 	}
-	return validate(s.validator, msg)
+	return validate(s.interceptor.validator, msg)
 }
 
 type optionFunc func(*Interceptor)
@@ -146,6 +192,9 @@ type optionFunc func(*Interceptor)
 func (f optionFunc) apply(i *Interceptor) { f(i) }
 
 func validate(validator protovalidate.Validator, msg any) error {
+	if msg == nil {
+		return nil
+	}
 	protoMsg, ok := msg.(proto.Message)
 	if !ok {
 		return fmt.Errorf("expected proto.Message, got %T", msg)

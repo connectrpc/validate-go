@@ -106,20 +106,20 @@ func main() {
 ```
 
 With the `validate.Interceptor` applied, our `UserService` implementation can
-assume that all requests have already been validated &mdash; no need for
-hand-written boilerplate!
+assume that all requests (and optionally responses) have already been
+validated &mdash; no need for hand-written boilerplate!
 
 ## FAQ
 
 ### Does this interceptor work with Connect clients?
 
-Yes: it validates request messages before sending them to the server. But
-unless you're _sure_ that your clients always have an up-to-date schema, it's
-better to let the server handle validation.
+Yes: it validates request messages before sending them to the server, and optionally
+responses when they are received. But unless you're _sure_ that your clients always have
+an up-to-date schema, it's better to let the server handle validation.
 
 ### How do clients know which fields are invalid?
 
-If the request message fails validation, the interceptor returns an error coded
+If the message fails validation, the interceptor returns an error coded
 with `connect.CodeInvalidArgument`. It also adds a [detailed representation of the
 validation error(s)][violations] as an [error detail][connect-error-detail].
 
@@ -136,7 +136,9 @@ configuration files, and `make generate` [recipe](Makefile).
 
 ### Does the interceptor validate responses?
 
-No. On both clients and servers, the interceptor only validates requests.
+By default, on both clients and servers, the interceptor only validates requests.
+If you'd additionally like to validate responses, use the `WithValidateResponses`
+option when constructing your `Interceptor`.
 
 ## Ecosystem
 
@@ -152,7 +154,7 @@ release.
 
 It supports:
 
-* The three most recent major releases of Go. Keep in mind that [only the last
+* The two most recent major releases of Go. Keep in mind that [only the last
   two releases receive security patches][go-support-policy].
 * [APIv2] of Protocol Buffers in Go (`google.golang.org/protobuf`).
 
