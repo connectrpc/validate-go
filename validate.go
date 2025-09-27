@@ -60,6 +60,15 @@ func WithValidateResponses() Option {
 	})
 }
 
+// WithoutErrorDetails configures the [Interceptor] to elide error details from
+// validation errors. By default, a [protovalidate.ValidationError] is added
+// as a detail when validation errors are returned.
+func WithoutErrorDetails() Option {
+	return optionFunc(func(i *Interceptor) {
+		i.noErrorDetails = true
+	})
+}
+
 // Interceptor is a [connect.Interceptor] that ensures that RPC request
 // messages match the constraints expressed in their Protobuf schemas. It does
 // not validate response messages unless the [WithValidateResponses] option
@@ -83,6 +92,7 @@ func WithValidateResponses() Option {
 type Interceptor struct {
 	validator         protovalidate.Validator
 	validateResponses bool
+	noErrorDetails    bool
 }
 
 // NewInterceptor builds an Interceptor. The default configuration is
@@ -103,7 +113,7 @@ func NewInterceptor(opts ...Option) *Interceptor {
 // WrapUnary implements connect.Interceptor.
 func (i *Interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		if err := validate(i.validator, req.Any()); err != nil {
+		if err := i.validate(req.Any()); err != nil {
 			return nil, err
 		}
 		response, err := next(ctx, req)
@@ -111,7 +121,7 @@ func (i *Interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 			return response, err
 		}
 		if i.validateResponses {
-			if err := validate(i.validator, response.Any()); err != nil {
+			if err := i.validate(response.Any()); err != nil {
 				return response, err
 			}
 		}
@@ -139,6 +149,29 @@ func (i *Interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) co
 	}
 }
 
+func (i *Interceptor) validate(msg any) error {
+	if msg == nil {
+		return nil
+	}
+	protoMsg, ok := msg.(proto.Message)
+	if !ok {
+		return fmt.Errorf("expected proto.Message, got %T", msg)
+	}
+	err := i.validator.Validate(protoMsg)
+	if err == nil {
+		return nil
+	}
+	connectErr := connect.NewError(connect.CodeInvalidArgument, err)
+	if !i.noErrorDetails {
+		if validationErr := new(protovalidate.ValidationError); errors.As(err, &validationErr) {
+			if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
+				connectErr.AddDetail(detail)
+			}
+		}
+	}
+	return connectErr
+}
+
 type streamingClientInterceptor struct {
 	connect.StreamingClientConn
 
@@ -146,7 +179,7 @@ type streamingClientInterceptor struct {
 }
 
 func (s *streamingClientInterceptor) Send(msg any) error {
-	if err := validate(s.interceptor.validator, msg); err != nil {
+	if err := s.interceptor.validate(msg); err != nil {
 		return err
 	}
 	return s.StreamingClientConn.Send(msg)
@@ -157,7 +190,7 @@ func (s *streamingClientInterceptor) Receive(msg any) error {
 		return err
 	}
 	if s.interceptor.validateResponses {
-		return validate(s.interceptor.validator, msg)
+		return s.interceptor.validate(msg)
 	}
 	return nil
 }
@@ -170,7 +203,7 @@ type streamingHandlerInterceptor struct {
 
 func (s *streamingHandlerInterceptor) Send(msg any) error {
 	if s.interceptor.validateResponses {
-		if err := validate(s.interceptor.validator, msg); err != nil {
+		if err := s.interceptor.validate(msg); err != nil {
 			return err
 		}
 	}
@@ -181,30 +214,9 @@ func (s *streamingHandlerInterceptor) Receive(msg any) error {
 	if err := s.StreamingHandlerConn.Receive(msg); err != nil {
 		return err
 	}
-	return validate(s.interceptor.validator, msg)
+	return s.interceptor.validate(msg)
 }
 
 type optionFunc func(*Interceptor)
 
 func (f optionFunc) apply(i *Interceptor) { f(i) }
-
-func validate(validator protovalidate.Validator, msg any) error {
-	if msg == nil {
-		return nil
-	}
-	protoMsg, ok := msg.(proto.Message)
-	if !ok {
-		return fmt.Errorf("expected proto.Message, got %T", msg)
-	}
-	err := validator.Validate(protoMsg)
-	if err == nil {
-		return nil
-	}
-	connectErr := connect.NewError(connect.CodeInvalidArgument, err)
-	if validationErr := new(protovalidate.ValidationError); errors.As(err, &validationErr) {
-		if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
-			connectErr.AddDetail(detail)
-		}
-	}
-	return connectErr
-}
