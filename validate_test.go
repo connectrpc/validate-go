@@ -33,16 +33,18 @@ import (
 	"connectrpc.com/validate/internal/gen/example/user/v1/userv1connect"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestInterceptorUnary(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name     string
-		svc      func(context.Context, *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error)
-		req      *userv1.CreateUserRequest
-		wantCode connect.Code
-		wantPath string // field path, from error details
+		name              string
+		svc               func(context.Context, *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error)
+		req               *userv1.CreateUserRequest
+		validateResponses bool
+		wantCode          connect.Code
+		wantPath          string // field path, from error details
 	}{
 		{
 			name: "valid",
@@ -61,20 +63,32 @@ func TestInterceptorUnary(t *testing.T) {
 		},
 		{
 			name: "underlying_error",
-			svc: func(_ context.Context, _ *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error) {
-				return nil, connect.NewError(connect.CodeInternal, errors.New("oh no"))
-			},
+			svc:  createUserError,
 			req: &userv1.CreateUserRequest{
 				User: &userv1.User{Email: "someone@example.com"},
 			},
 			wantCode: connect.CodeInternal,
+		},
+		{
+			name: "invalid_response",
+			svc:  createUserInvalidResponse,
+			req: &userv1.CreateUserRequest{
+				User: &userv1.User{Email: "foo@foo.com"},
+			},
+			validateResponses: true,
+			wantCode:          connect.CodeInvalidArgument,
+			wantPath:          "user.email",
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			validator, err := validate.NewInterceptor()
+			var opts []validate.Option
+			if test.validateResponses {
+				opts = append(opts, validate.WithValidateResponses())
+			}
+			validator, err := validate.NewInterceptor(opts...)
 			require.NoError(t, err)
 
 			mux := http.NewServeMux()
@@ -86,7 +100,7 @@ func TestInterceptorUnary(t *testing.T) {
 			srv := startHTTPServer(t, mux)
 
 			got, err := userv1connect.NewUserServiceClient(srv.Client(), srv.URL).
-				CreateUser(context.Background(), connect.NewRequest(test.req))
+				CreateUser(t.Context(), connect.NewRequest(test.req))
 
 			if test.wantCode > 0 {
 				require.Error(t, err)
@@ -114,11 +128,12 @@ func TestInterceptorUnary(t *testing.T) {
 func TestInterceptorStreamingHandler(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name     string
-		svc      func(context.Context, *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error
-		req      *calculatorv1.CumSumRequest
-		wantCode connect.Code
-		wantPath string // field path, from error details
+		name              string
+		svc               func(context.Context, *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error
+		req               *calculatorv1.CumSumRequest
+		validateResponses bool
+		wantCode          connect.Code
+		wantPath          string // field path, from error details
 	}{
 		{
 			name:     "invalid",
@@ -138,12 +153,23 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 			req:      &calculatorv1.CumSumRequest{Number: 1},
 			wantCode: connect.CodeInternal,
 		},
+		{
+			name:              "invalid_response",
+			svc:               cumSumInvalidResponse,
+			req:               &calculatorv1.CumSumRequest{Number: 1},
+			validateResponses: true,
+			wantCode:          connect.CodeInvalidArgument,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			validator, err := validate.NewInterceptor()
+			var opts []validate.Option
+			if test.validateResponses {
+				opts = append(opts, validate.WithValidateResponses())
+			}
+			validator, err := validate.NewInterceptor(opts...)
 			require.NoError(t, err)
 
 			mux := http.NewServeMux()
@@ -158,7 +184,7 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 			t.Cleanup(srv.Close)
 
 			client := calculatorv1connect.NewCalculatorServiceClient(srv.Client(), srv.URL)
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			t.Cleanup(cancel)
 			stream := client.CumSum(ctx)
 			t.Cleanup(func() {
@@ -199,12 +225,13 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 func TestInterceptorStreamingClient(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name            string
-		svc             func(context.Context, *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error
-		req             *calculatorv1.CumSumRequest
-		wantCode        connect.Code
-		wantPath        string       // field path, from error details
-		wantReceiveCode connect.Code // code for error calling Receive()
+		name              string
+		svc               func(context.Context, *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error
+		req               *calculatorv1.CumSumRequest
+		validateResponses bool
+		wantCode          connect.Code
+		wantPath          string       // field path, from error details
+		wantReceiveCode   connect.Code // code for error calling Receive()
 	}{
 		{
 			name:     "invalid",
@@ -224,12 +251,23 @@ func TestInterceptorStreamingClient(t *testing.T) {
 			req:             &calculatorv1.CumSumRequest{Number: 1},
 			wantReceiveCode: connect.CodeInternal,
 		},
+		{
+			name:              "invalid_response",
+			svc:               cumSumInvalidResponse,
+			req:               &calculatorv1.CumSumRequest{Number: 1},
+			validateResponses: true,
+			wantReceiveCode:   connect.CodeInvalidArgument,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			validator, err := validate.NewInterceptor()
+			var opts []validate.Option
+			if test.validateResponses {
+				opts = append(opts, validate.WithValidateResponses())
+			}
+			validator, err := validate.NewInterceptor(opts...)
 			require.NoError(t, err)
 
 			mux := http.NewServeMux()
@@ -247,7 +285,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 				srv.URL,
 				connect.WithInterceptors(validator),
 			)
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			t.Cleanup(cancel)
 			stream := client.CumSum(ctx)
 			t.Cleanup(func() {
@@ -307,7 +345,7 @@ func TestWithValidator(t *testing.T) {
 		User: &userv1.User{Email: "someone@example.com"},
 	})
 	_, err = userv1connect.NewUserServiceClient(srv.Client(), srv.URL).
-		CreateUser(context.Background(), req)
+		CreateUser(t.Context(), req)
 	require.Error(t, err)
 	require.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 }
@@ -323,6 +361,15 @@ func startHTTPServer(tb testing.TB, h http.Handler) *httptest.Server {
 
 func createUser(_ context.Context, req *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error) {
 	return connect.NewResponse(&userv1.CreateUserResponse{User: req.Msg.User}), nil
+}
+func createUserError(_ context.Context, _ *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error) {
+	return nil, connect.NewError(connect.CodeInternal, errors.New("oh no"))
+}
+
+func createUserInvalidResponse(_ context.Context, req *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error) {
+	newUser := proto.CloneOf(req.Msg.User)
+	newUser.Email = "nonsense"
+	return connect.NewResponse(&userv1.CreateUserResponse{User: newUser}), nil
 }
 
 func cumSumSuccess(_ context.Context, stream *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error {
@@ -343,4 +390,20 @@ func cumSumSuccess(_ context.Context, stream *connect.BidiStream[calculatorv1.Cu
 
 func cumSumError(_ context.Context, _ *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error {
 	return connect.NewError(connect.CodeInternal, errors.New("boom"))
+}
+
+func cumSumInvalidResponse(_ context.Context, stream *connect.BidiStream[calculatorv1.CumSumRequest, calculatorv1.CumSumResponse]) error {
+	var sum int64
+	for {
+		req, err := stream.Receive()
+		if errors.Is(err, io.EOF) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		sum += req.Number
+		if err := stream.Send(&calculatorv1.CumSumResponse{Sum: sum * -1}); err != nil {
+			return err
+		}
+	}
 }

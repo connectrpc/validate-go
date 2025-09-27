@@ -11,6 +11,7 @@ export PATH := $(BIN):$(PATH)
 export GOBIN := $(abspath $(BIN))
 COPYRIGHT_YEARS := 2023-2025
 LICENSE_IGNORE := --ignore testdata/
+BUF_VERSION = v1.57.2
 
 .PHONY: help
 help: ## Describe useful make targets
@@ -70,11 +71,11 @@ checkgenerate:
 
 $(BIN)/buf: Makefile
 	@mkdir -p $(@D)
-	go install github.com/bufbuild/buf/cmd/buf@v1.50.0
+	go install github.com/bufbuild/buf/cmd/buf@$(BUF_VERSION)
 
 $(BIN)/license-header: Makefile
 	@mkdir -p $(@D)
-	go install github.com/bufbuild/buf/private/pkg/licenseheader/cmd/license-header@v1.50.0
+	go install github.com/bufbuild/buf/private/pkg/licenseheader/cmd/license-header@$(BUF_VERSION)
 
 $(BIN)/golangci-lint: Makefile
 	@mkdir -p $(@D)

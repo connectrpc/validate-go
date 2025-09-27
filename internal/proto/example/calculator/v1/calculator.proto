@@ -23,7 +23,7 @@ message CumSumRequest {
 }
 
 message CumSumResponse {
-  int64 sum = 1;
+  int64 sum = 1 [(buf.validate.field).int64.gt = 0];
 }
 
 service CalculatorService {
