@@ -76,7 +76,7 @@ func TestInterceptorUnary(t *testing.T) {
 				User: &userv1.User{Email: "foo@foo.com"},
 			},
 			validateResponses: true,
-			wantCode:          connect.CodeInvalidArgument,
+			wantCode:          connect.CodeInternal,
 			wantPath:          "user.email",
 		},
 	}
@@ -157,7 +157,7 @@ func TestInterceptorStreamingHandler(t *testing.T) {
 			svc:               cumSumInvalidResponse,
 			req:               &calculatorv1.CumSumRequest{Number: 1},
 			validateResponses: true,
-			wantCode:          connect.CodeInvalidArgument,
+			wantCode:          connect.CodeInternal,
 		},
 	}
 	for _, test := range tests {
@@ -254,7 +254,7 @@ func TestInterceptorStreamingClient(t *testing.T) {
 			svc:               cumSumInvalidResponse,
 			req:               &calculatorv1.CumSumRequest{Number: 1},
 			validateResponses: true,
-			wantReceiveCode:   connect.CodeInvalidArgument,
+			wantReceiveCode:   connect.CodeInternal,
 		},
 	}
 	for _, test := range tests {
