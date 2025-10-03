@@ -49,9 +49,9 @@ func WithValidator(validator protovalidate.Validator) Option {
 //
 // By default:
 //
-// - Unary: Response messages from the server are not validated.
-// - Client streams: Received messages are not validated.
-// - Server streams: Sent messages are not validated.
+//   - Unary: Response messages from the server are not validated.
+//   - Client streams: Received messages are not validated.
+//   - Server streams: Sent messages are not validated.
 //
 // However, these messages are all validated if this option is set.
 func WithValidateResponses() Option {
