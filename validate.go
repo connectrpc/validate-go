@@ -35,8 +35,8 @@ type Option interface {
 }
 
 // WithValidator configures the [Interceptor] to use a customized
-// [protovalidate.Validator]. By default, [protovalidate.GlobalInterceptor]
-// is used See [protovalidate.ValidatorOption] for the range of available
+// [protovalidate.Validator]. By default, [protovalidate.GlobalValidator]
+// is used. See [protovalidate.ValidatorOption] for the range of available
 // customizations.
 func WithValidator(validator protovalidate.Validator) Option {
 	return optionFunc(func(i *Interceptor) {
