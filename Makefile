@@ -10,7 +10,7 @@ BIN := .tmp/bin
 export PATH := $(BIN):$(PATH)
 export GOBIN := $(abspath $(BIN))
 COPYRIGHT_YEARS := 2023-2026
-LICENSE_IGNORE := --ignore testdata/ -ignore .github/ --ignore ".*\.ya?ml"
+LICENSE_IGNORE := --ignore testdata/ --ignore .github/ --ignore ".*\.ya?ml"
 BUF_VERSION = v1.69.0
 
 .PHONY: help
