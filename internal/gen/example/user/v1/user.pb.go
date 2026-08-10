@@ -203,8 +203,8 @@ const file_example_user_v1_user_proto_rawDesc = "" +
 	"\x04user\x18\x01 \x01(\v2\x15.example.user.v1.UserR\x04user2f\n" +
 	"\vUserService\x12W\n" +
 	"\n" +
-	"CreateUser\x12\".example.user.v1.CreateUserRequest\x1a#.example.user.v1.CreateUserResponse\"\x00B\xbb\x01\n" +
-	"\x13com.example.user.v1B\tUserProtoP\x01Z;connectrpc.com/validate/internal/gen/example/user/v1;userv1\xa2\x02\x03EUX\xaa\x02\x0fExample.User.V1\xca\x02\x0fExample\\User\\V1\xe2\x02\x1bExample\\User\\V1\\GPBMetadata\xea\x02\x11Example::User::V1b\x06proto3"
+	"CreateUser\x12\".example.user.v1.CreateUserRequest\x1a#.example.user.v1.CreateUserResponse\"\x00B\xbe\x01\n" +
+	"\x13com.example.user.v1B\tUserProtoP\x01Z>connectrpc.com/validate/v2/internal/gen/example/user/v1;userv1\xa2\x02\x03EUX\xaa\x02\x0fExample.User.V1\xca\x02\x0fExample\\User\\V1\xe2\x02\x1bExample\\User\\V1\\GPBMetadata\xea\x02\x11Example::User::V1b\x06proto3"
 
 var (
 	file_example_user_v1_user_proto_rawDescOnce sync.Once
