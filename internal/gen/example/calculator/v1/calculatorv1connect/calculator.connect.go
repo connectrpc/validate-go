@@ -19,106 +19,146 @@
 package calculatorv1connect
 
 import (
-	connect "connectrpc.com/connect"
-	v1 "connectrpc.com/validate/internal/gen/example/calculator/v1"
+	connect "connectrpc.com/connect/v2"
+	v1 "connectrpc.com/validate/v2/internal/gen/example/calculator/v1"
 	context "context"
-	errors "errors"
-	http "net/http"
-	strings "strings"
+	sync "sync"
 )
-
-// This is a compile-time assertion to ensure that this generated file and the connect package are
-// compatible. If you get a compiler error that this constant is not defined, this code was
-// generated with a version of connect newer than the one compiled into your binary. You can fix the
-// problem by either regenerating this code with an older version of connect or updating the connect
-// version compiled into your binary.
-const _ = connect.IsAtLeastVersion1_13_0
 
 const (
 	// CalculatorServiceName is the fully-qualified name of the CalculatorService service.
 	CalculatorServiceName = "example.calculator.v1.CalculatorService"
 )
 
-// These constants are the fully-qualified names of the RPCs defined in this package. They're
-// exposed at runtime as Spec.Procedure and as the final two segments of the HTTP route.
+// These constants are the procedure names of the RPCs defined in this package. They're exposed at
+// runtime as Spec.Procedure and as the final two segments of the HTTP route.
 //
 // Note that these are different from the fully-qualified method names used by
 // google.golang.org/protobuf/reflect/protoreflect. To convert from these constants to
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
-	// CalculatorServiceCumSumProcedure is the fully-qualified name of the CalculatorService's CumSum
-	// RPC.
+	// CalculatorServiceCumSumProcedure is the procedure name of the CalculatorService's CumSum RPC.
 	CalculatorServiceCumSumProcedure = "/example.calculator.v1.CalculatorService/CumSum"
+)
+
+var (
+	calculatorServiceCumSumSpec = sync.OnceValue(func() connect.Spec {
+		return connect.Spec{
+			StreamType: connect.StreamTypeBidi,
+			Schema:     v1.File_example_calculator_v1_calculator_proto.Services().ByName("CalculatorService").Methods().ByName("CumSum"),
+			Procedure:  CalculatorServiceCumSumProcedure,
+		}
+	})
 )
 
 // CalculatorServiceClient is a client for the example.calculator.v1.CalculatorService service.
 type CalculatorServiceClient interface {
-	CumSum(context.Context) *connect.BidiStreamForClient[v1.CumSumRequest, v1.CumSumResponse]
+	CumSum(context.Context) (CalculatorServiceCumSumClientStream, error)
 }
 
 // NewCalculatorServiceClient constructs a client for the example.calculator.v1.CalculatorService
-// service. By default, it uses the Connect protocol with the binary Protobuf Codec, asks for
-// gzipped responses, and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply
-// the connect.WithGRPC() or connect.WithGRPCWeb() options.
-//
-// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
-// http://api.acme.com or https://acme.com/grpc).
-func NewCalculatorServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) CalculatorServiceClient {
-	baseURL = strings.TrimRight(baseURL, "/")
-	calculatorServiceMethods := v1.File_example_calculator_v1_calculator_proto.Services().ByName("CalculatorService").Methods()
-	return &calculatorServiceClient{
-		cumSum: connect.NewClient[v1.CumSumRequest, v1.CumSumResponse](
-			httpClient,
-			baseURL+CalculatorServiceCumSumProcedure,
-			connect.WithSchema(calculatorServiceMethods.ByName("CumSum")),
-			connect.WithClientOptions(opts...),
-		),
+// service. Multiple service clients may share a single connect.Client.
+func NewCalculatorServiceClient(client *connect.Client) CalculatorServiceClient {
+	return &calculatorServiceClient{client: client}
+}
+
+// CalculatorServiceCumSumClientStream is the client stream for the CalculatorService's CumSum RPC.
+type CalculatorServiceCumSumClientStream struct {
+	stream connect.ClientStream
+}
+
+// SendHeaders opens the stream and flushes the request headers without a message. The first Send or
+// Receive does this implicitly.
+func (s CalculatorServiceCumSumClientStream) SendHeaders() error {
+	return s.stream.SendHeaders()
+}
+
+// Send sends a request message to the server.
+func (s CalculatorServiceCumSumClientStream) Send(req *v1.CumSumRequest) error {
+	return s.stream.Send(req)
+}
+
+// CloseSend closes the request side of the stream.
+func (s CalculatorServiceCumSumClientStream) CloseSend() error {
+	return s.stream.CloseSend()
+}
+
+// Receive returns the next response message from the server.
+func (s CalculatorServiceCumSumClientStream) Receive() (*v1.CumSumResponse, error) {
+	var res v1.CumSumResponse
+	if err := s.stream.Receive(&res); err != nil {
+		return nil, err
 	}
+	return &res, nil
 }
 
-// calculatorServiceClient implements CalculatorServiceClient.
-type calculatorServiceClient struct {
-	cumSum *connect.Client[v1.CumSumRequest, v1.CumSumResponse]
-}
-
-// CumSum calls example.calculator.v1.CalculatorService.CumSum.
-func (c *calculatorServiceClient) CumSum(ctx context.Context) *connect.BidiStreamForClient[v1.CumSumRequest, v1.CumSumResponse] {
-	return c.cumSum.CallBidiStream(ctx)
+// Close releases the stream's resources. It is idempotent and is typically deferred to clean up a
+// stream abandoned before io.EOF.
+func (s CalculatorServiceCumSumClientStream) Close() error {
+	return s.stream.Close()
 }
 
 // CalculatorServiceHandler is an implementation of the example.calculator.v1.CalculatorService
 // service.
 type CalculatorServiceHandler interface {
-	CumSum(context.Context, *connect.BidiStream[v1.CumSumRequest, v1.CumSumResponse]) error
+	CumSum(context.Context, CalculatorServiceCumSumServerStream) error
 }
 
-// NewCalculatorServiceHandler builds an HTTP handler from the service implementation. It returns
-// the path on which to mount the handler and the handler itself.
-//
-// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
-// and JSON codecs. They also support gzip compression.
-func NewCalculatorServiceHandler(svc CalculatorServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	calculatorServiceMethods := v1.File_example_calculator_v1_calculator_proto.Services().ByName("CalculatorService").Methods()
-	calculatorServiceCumSumHandler := connect.NewBidiStreamHandler(
-		CalculatorServiceCumSumProcedure,
-		svc.CumSum,
-		connect.WithSchema(calculatorServiceMethods.ByName("CumSum")),
-		connect.WithHandlerOptions(opts...),
+// RegisterCalculatorServiceHandler registers svc as the example.calculator.v1.CalculatorService
+// implementation on server.
+func RegisterCalculatorServiceHandler(server *connect.Server, svc CalculatorServiceHandler) {
+	adapter := calculatorServiceHandler{svc: svc}
+	server.Register(
+		connect.Method{Spec: calculatorServiceCumSumSpec(), Handler: adapter.cumSum},
 	)
-	return "/example.calculator.v1.CalculatorService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case CalculatorServiceCumSumProcedure:
-			calculatorServiceCumSumHandler.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
-		}
-	})
+}
+
+// CalculatorServiceCumSumServerStream is the server stream for the CalculatorService's CumSum RPC.
+type CalculatorServiceCumSumServerStream struct {
+	stream connect.ServerStream
+}
+
+// Receive returns the next request message from the client.
+func (s CalculatorServiceCumSumServerStream) Receive() (*v1.CumSumRequest, error) {
+	var req v1.CumSumRequest
+	if err := s.stream.Receive(&req); err != nil {
+		return nil, err
+	}
+	return &req, nil
+}
+
+// SendHeaders flushes the response headers without a message. The first Send does this implicitly.
+func (s CalculatorServiceCumSumServerStream) SendHeaders() error {
+	return s.stream.SendHeaders()
+}
+
+// Send sends a response message to the client.
+func (s CalculatorServiceCumSumServerStream) Send(res *v1.CumSumResponse) error {
+	return s.stream.Send(res)
 }
 
 // UnimplementedCalculatorServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedCalculatorServiceHandler struct{}
 
-func (UnimplementedCalculatorServiceHandler) CumSum(context.Context, *connect.BidiStream[v1.CumSumRequest, v1.CumSumResponse]) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("example.calculator.v1.CalculatorService.CumSum is not implemented"))
+func (UnimplementedCalculatorServiceHandler) CumSum(context.Context, CalculatorServiceCumSumServerStream) error {
+	return connect.NewError(connect.CodeUnimplemented, "example.calculator.v1.CalculatorService.CumSum is not implemented")
+}
+
+type calculatorServiceClient struct {
+	client *connect.Client
+}
+
+func (c *calculatorServiceClient) CumSum(ctx context.Context) (CalculatorServiceCumSumClientStream, error) {
+	stream, err := c.client.CallClientStream(ctx, calculatorServiceCumSumSpec())
+	if err != nil {
+		return CalculatorServiceCumSumClientStream{}, err
+	}
+	return CalculatorServiceCumSumClientStream{stream: stream}, nil
+}
+
+type calculatorServiceHandler struct{ svc CalculatorServiceHandler }
+
+func (h calculatorServiceHandler) cumSum(ctx context.Context, _ connect.Spec, stream connect.ServerStream) error {
+	return h.svc.CumSum(ctx, CalculatorServiceCumSumServerStream{stream: stream})
 }

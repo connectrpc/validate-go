@@ -12,11 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package validate provides a [connect.Interceptor] that validates messages
+// Package validate provides connect-go v2 interceptors that validate messages
 // against constraints specified in their Protobuf schemas. Because the
-// interceptor is powered by [protovalidate], validation is flexible,
+// interceptors are powered by [protovalidate], validation is flexible,
 // efficient, and consistent across languages - without additional code
 // generation.
+//
+// Server-side use:
+//
+//	server := connect.NewServer(validate.NewServerInterceptor())
+//
+// Client-side use (discouraged unless the client always has an up-to-date
+// schema):
+//
+//	client := pingv1connect.NewPingServiceClient(
+//	    connect.NewClient(transport, validate.NewClientInterceptor()),
+//	)
 package validate
 
 import (
@@ -25,26 +36,28 @@ import (
 	"fmt"
 
 	"buf.build/go/protovalidate"
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connectproto"
 	"google.golang.org/protobuf/proto"
 )
 
-// An Option configures an [Interceptor].
+// An Option configures an interceptor built by [NewServerInterceptor] or
+// [NewClientInterceptor].
 type Option interface {
-	apply(*Interceptor)
+	apply(*config)
 }
 
-// WithValidator configures the [Interceptor] to use a customized
+// WithValidator configures the interceptor to use a customized
 // [protovalidate.Validator]. By default, [protovalidate.GlobalValidator]
 // is used. See [protovalidate.ValidatorOption] for the range of available
 // customizations.
 func WithValidator(validator protovalidate.Validator) Option {
-	return optionFunc(func(i *Interceptor) {
-		i.validator = validator
+	return optionFunc(func(c *config) {
+		c.validator = validator
 	})
 }
 
-// WithValidateResponses configures the [Interceptor] to also validate reponses
+// WithValidateResponses configures the interceptor to also validate responses
 // in addition to validating requests.
 //
 // By default:
@@ -55,110 +68,98 @@ func WithValidator(validator protovalidate.Validator) Option {
 //
 // However, these messages are all validated if this option is set.
 func WithValidateResponses() Option {
-	return optionFunc(func(i *Interceptor) {
-		i.validateResponses = true
+	return optionFunc(func(c *config) {
+		c.validateResponses = true
 	})
 }
 
-// WithoutErrorDetails configures the [Interceptor] to elide error details from
+// WithoutErrorDetails configures the interceptor to elide error details from
 // validation errors. By default, a [protovalidate.ValidationError] is added
 // as a detail when validation errors are returned.
 func WithoutErrorDetails() Option {
-	return optionFunc(func(i *Interceptor) {
-		i.noErrorDetails = true
+	return optionFunc(func(c *config) {
+		c.noErrorDetails = true
 	})
 }
 
-// Interceptor is a [connect.Interceptor] that ensures that RPC request
-// messages match the constraints expressed in their Protobuf schemas. It does
-// not validate response messages unless the [WithValidateResponses] option
-// is specified.
+// NewServerInterceptor returns a [connect.ServerInterceptor] that
+// validates request messages received from the client. When
+// [WithValidateResponses] is set, it also validates response messages sent
+// by the server.
 //
-// By default, Interceptors use a validator that lazily compiles constraints
-// and works with any Protobuf message. This is a simple, widely-applicable
-// configuration: after compiling and caching the constraints for a Protobuf
-// message type once, validation is very efficient. To customize the validator,
-// use [WithValidator] and [protovalidate.ValidatorOption].
-//
-// RPCs with invalid request messages short-circuit with an error. The error
-// always uses [connect.CodeInvalidArgument] and has a [detailed representation
-// of the error] attached as a [connect.ErrorDetail].
-//
-// This interceptor is primarily intended for use on handlers. Client-side use
-// is possible, but discouraged unless the client always has an up-to-date
-// schema.
+// Invalid request messages short-circuit with
+// [connect.CodeInvalidArgument]. Invalid response messages short-circuit
+// with [connect.CodeInternal]. Both errors carry a [detailed
+// representation of the error] as an error detail unless
+// [WithoutErrorDetails] is set.
 //
 // [detailed representation of the error]: https://pkg.go.dev/buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate#Violations
-type Interceptor struct {
+func NewServerInterceptor(opts ...Option) connect.ServerInterceptor {
+	cfg := newConfig(opts)
+	return func(next connect.ServerFunc) connect.ServerFunc {
+		return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
+			return next(ctx, spec, &serverStream{ServerStream: stream, config: cfg})
+		}
+	}
+}
+
+// NewClientInterceptor returns a [connect.ClientInterceptor] that
+// validates request messages sent to the server. When
+// [WithValidateResponses] is set, it also validates response messages
+// received from the server.
+//
+// Client-side use is discouraged unless the client always has an
+// up-to-date schema; prefer running validation on the server.
+//
+// Invalid request messages short-circuit with
+// [connect.CodeInvalidArgument]. Invalid response messages short-circuit
+// with [connect.CodeInternal]. Both errors carry a [detailed
+// representation of the error] as an error detail unless
+// [WithoutErrorDetails] is set.
+//
+// [detailed representation of the error]: https://pkg.go.dev/buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate#Violations
+func NewClientInterceptor(opts ...Option) connect.ClientInterceptor {
+	cfg := newConfig(opts)
+	return func(next connect.ClientFunc) connect.ClientFunc {
+		return func(ctx context.Context, spec connect.Spec) (connect.ClientStream, error) {
+			stream, err := next(ctx, spec)
+			if err != nil {
+				return nil, err
+			}
+			return &clientStream{ClientStream: stream, config: cfg}, nil
+		}
+	}
+}
+
+type config struct {
 	validator         protovalidate.Validator
 	validateResponses bool
 	noErrorDetails    bool
 }
 
-// NewInterceptor builds an Interceptor. The default configuration is
-// appropriate for most use cases.
-func NewInterceptor(opts ...Option) *Interceptor {
-	var interceptor Interceptor
+func newConfig(opts []Option) *config {
+	cfg := &config{}
 	for _, opt := range opts {
-		opt.apply(&interceptor)
+		opt.apply(cfg)
 	}
-
-	if interceptor.validator == nil {
-		interceptor.validator = protovalidate.GlobalValidator
+	if cfg.validator == nil {
+		cfg.validator = protovalidate.GlobalValidator
 	}
-
-	return &interceptor
+	return cfg
 }
 
-// WrapUnary implements connect.Interceptor.
-func (i *Interceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
-	return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-		if err := i.validateRequest(req.Any()); err != nil {
-			return nil, err
-		}
-		response, err := next(ctx, req)
-		if err != nil {
-			return response, err
-		}
-		if err := i.validateResponse(response.Any()); err != nil {
-			return response, err
-		}
-		return response, nil
-	}
+func (c *config) validateRequest(msg any) error {
+	return c.validate(msg, connect.CodeInvalidArgument)
 }
 
-// WrapStreamingClient implements connect.Interceptor.
-func (i *Interceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
-	return func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
-		return &streamingClientInterceptor{
-			StreamingClientConn: next(ctx, spec),
-			interceptor:         i,
-		}
-	}
-}
-
-// WrapStreamingHandler implements connect.Interceptor.
-func (i *Interceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
-	return func(ctx context.Context, conn connect.StreamingHandlerConn) error {
-		return next(ctx, &streamingHandlerInterceptor{
-			StreamingHandlerConn: conn,
-			interceptor:          i,
-		})
-	}
-}
-
-func (i *Interceptor) validateRequest(msg any) error {
-	return i.validate(msg, connect.CodeInvalidArgument)
-}
-
-func (i *Interceptor) validateResponse(msg any) error {
-	if !i.validateResponses {
+func (c *config) validateResponse(msg any) error {
+	if !c.validateResponses {
 		return nil
 	}
-	return i.validate(msg, connect.CodeInternal)
+	return c.validate(msg, connect.CodeInternal)
 }
 
-func (i *Interceptor) validate(msg any, code connect.Code) error {
+func (c *config) validate(msg any, code connect.Code) error {
 	if msg == nil {
 		return nil
 	}
@@ -166,61 +167,65 @@ func (i *Interceptor) validate(msg any, code connect.Code) error {
 	if !ok {
 		return fmt.Errorf("expected proto.Message, got %T", msg)
 	}
-	err := i.validator.Validate(protoMsg)
+	err := c.validator.Validate(protoMsg)
 	if err == nil {
 		return nil
 	}
-	connectErr := connect.NewError(code, err)
-	if !i.noErrorDetails {
+	connectErr := connect.Errorf(code, "%s", err.Error()).WithCause(err)
+	if !c.noErrorDetails {
 		if validationErr := new(protovalidate.ValidationError); errors.As(err, &validationErr) {
-			if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
-				connectErr.AddDetail(detail)
+			if detail, err := connectproto.NewErrorDetail(validationErr.ToProto()); err == nil {
+				connectErr = connectErr.WithDetail(detail)
 			}
 		}
 	}
 	return connectErr
 }
 
-type streamingClientInterceptor struct {
-	connect.StreamingClientConn
+// serverStream wraps a [connect.ServerStream] to validate request
+// messages on Receive and, when configured, response messages on Send.
+type serverStream struct {
+	connect.ServerStream
 
-	interceptor *Interceptor
+	config *config
 }
 
-func (s *streamingClientInterceptor) Send(msg any) error {
-	if err := s.interceptor.validateRequest(msg); err != nil {
+func (s *serverStream) Receive(msg any) error {
+	if err := s.ServerStream.Receive(msg); err != nil {
 		return err
 	}
-	return s.StreamingClientConn.Send(msg)
+	return s.config.validateRequest(msg)
 }
 
-func (s *streamingClientInterceptor) Receive(msg any) error {
-	if err := s.StreamingClientConn.Receive(msg); err != nil {
+func (s *serverStream) Send(msg any) error {
+	if err := s.config.validateResponse(msg); err != nil {
 		return err
 	}
-	return s.interceptor.validateResponse(msg)
+	return s.ServerStream.Send(msg)
 }
 
-type streamingHandlerInterceptor struct {
-	connect.StreamingHandlerConn
+// clientStream wraps a [connect.ClientStream] to validate request
+// messages on Send and, when configured, response messages on Receive.
+type clientStream struct {
+	connect.ClientStream
 
-	interceptor *Interceptor
+	config *config
 }
 
-func (s *streamingHandlerInterceptor) Send(msg any) error {
-	if err := s.interceptor.validateResponse(msg); err != nil {
+func (s *clientStream) Send(msg any) error {
+	if err := s.config.validateRequest(msg); err != nil {
 		return err
 	}
-	return s.StreamingHandlerConn.Send(msg)
+	return s.ClientStream.Send(msg)
 }
 
-func (s *streamingHandlerInterceptor) Receive(msg any) error {
-	if err := s.StreamingHandlerConn.Receive(msg); err != nil {
+func (s *clientStream) Receive(msg any) error {
+	if err := s.ClientStream.Receive(msg); err != nil {
 		return err
 	}
-	return s.interceptor.validateRequest(msg)
+	return s.config.validateResponse(msg)
 }
 
-type optionFunc func(*Interceptor)
+type optionFunc func(*config)
 
-func (f optionFunc) apply(i *Interceptor) { f(i) }
+func (f optionFunc) apply(c *config) { f(c) }

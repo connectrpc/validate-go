@@ -84,7 +84,7 @@ $(BIN)/golangci-lint: Makefile
 $(BIN)/protoc-gen-connect-go: Makefile go.mod
 	@mkdir -p $(@D)
 	@# The version of protoc-gen-connect-go is determined by the version in go.mod
-	go install connectrpc.com/connect/cmd/protoc-gen-connect-go
+	go install connectrpc.com/connect/v2/cmd/protoc-gen-connect-go
 
 $(BIN)/protoc-gen-go: Makefile go.mod
 	@mkdir -p $(@D)

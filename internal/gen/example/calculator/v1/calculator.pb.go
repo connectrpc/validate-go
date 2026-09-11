@@ -134,8 +134,8 @@ const file_example_calculator_v1_calculator_proto_rawDesc = "" +
 	"\x0eCumSumResponse\x12\x19\n" +
 	"\x03sum\x18\x01 \x01(\x03B\a\xbaH\x04\"\x02 \x00R\x03sum2p\n" +
 	"\x11CalculatorService\x12[\n" +
-	"\x06CumSum\x12$.example.calculator.v1.CumSumRequest\x1a%.example.calculator.v1.CumSumResponse\"\x00(\x010\x01B\xeb\x01\n" +
-	"\x19com.example.calculator.v1B\x0fCalculatorProtoP\x01ZGconnectrpc.com/validate/internal/gen/example/calculator/v1;calculatorv1\xa2\x02\x03ECX\xaa\x02\x15Example.Calculator.V1\xca\x02\x15Example\\Calculator\\V1\xe2\x02!Example\\Calculator\\V1\\GPBMetadata\xea\x02\x17Example::Calculator::V1b\x06proto3"
+	"\x06CumSum\x12$.example.calculator.v1.CumSumRequest\x1a%.example.calculator.v1.CumSumResponse\"\x00(\x010\x01B\xee\x01\n" +
+	"\x19com.example.calculator.v1B\x0fCalculatorProtoP\x01ZJconnectrpc.com/validate/v2/internal/gen/example/calculator/v1;calculatorv1\xa2\x02\x03ECX\xaa\x02\x15Example.Calculator.V1\xca\x02\x15Example\\Calculator\\V1\xe2\x02!Example\\Calculator\\V1\\GPBMetadata\xea\x02\x17Example::Calculator::V1b\x06proto3"
 
 var (
 	file_example_calculator_v1_calculator_proto_rawDescOnce sync.Once
