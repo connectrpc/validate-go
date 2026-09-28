@@ -1,10 +1,10 @@
 # Validate
 
 [![Build](https://github.com/connectrpc/validate-go/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/connectrpc/validate-go/actions/workflows/ci.yaml)
-[![Report Card](https://goreportcard.com/badge/connectrpc.com/validate/v2)](https://goreportcard.com/report/connectrpc.com/validate/v2)
-[![GoDoc](https://pkg.go.dev/badge/connectrpc.com/validate/v2.svg)](https://pkg.go.dev/connectrpc.com/validate/v2)
+[![Report Card](https://goreportcard.com/badge/connectrpc.com/validate)](https://goreportcard.com/report/connectrpc.com/validate)
+[![GoDoc](https://pkg.go.dev/badge/connectrpc.com/validate.svg)](https://pkg.go.dev/connectrpc.com/validate)
 
-`connectrpc.com/validate/v2` provides [Connect][connect-go] interceptors that
+`connectrpc.com/validate` provides [Connect][connect-go] interceptors that
 take the tedium out of data validation. Rather than hand-writing repetitive
 documentation and code &mdash; verifying that `User.email` is valid, or that
 `User.age` falls within reasonable bounds &mdash; you can instead encode those
@@ -19,7 +19,7 @@ generation.
 ## Installation
 
 ```bash
-go get connectrpc.com/validate/v2
+go get connectrpc.com/validate
 ```
 
 ## A small example
@@ -83,8 +83,8 @@ import (
 
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
-	"connectrpc.com/validate/v2"
-	"connectrpc.com/validate/v2/internal/gen/example/user/v1/userv1connect"
+	"connectrpc.com/validate"
+	"connectrpc.com/validate/internal/gen/example/user/v1/userv1connect"
 )
 
 func main() {

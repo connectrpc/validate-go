@@ -20,7 +20,7 @@ package calculatorv1connect
 
 import (
 	connect "connectrpc.com/connect/v2"
-	v1 "connectrpc.com/validate/v2/internal/gen/example/calculator/v1"
+	v1 "connectrpc.com/validate/internal/gen/example/calculator/v1"
 	context "context"
 	sync "sync"
 )

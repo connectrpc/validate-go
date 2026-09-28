@@ -20,7 +20,7 @@ package userv1connect
 
 import (
 	connect "connectrpc.com/connect/v2"
-	v1 "connectrpc.com/validate/v2/internal/gen/example/user/v1"
+	v1 "connectrpc.com/validate/internal/gen/example/user/v1"
 	context "context"
 	sync "sync"
 )

@@ -1,4 +1,4 @@
-module connectrpc.com/validate/v2
+module connectrpc.com/validate
 
 go 1.26.0
 
