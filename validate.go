@@ -28,6 +28,8 @@
 //	client := pingv1connect.NewPingServiceClient(
 //	    connect.NewClient(transport, validate.NewClientInterceptor()),
 //	)
+//
+// For connect-go v1, use [NewInterceptor].
 package validate
 
 import (
@@ -41,8 +43,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// An Option configures an interceptor built by [NewServerInterceptor] or
-// [NewClientInterceptor].
+// An Option configures an interceptor built by [NewServerInterceptor],
+// [NewClientInterceptor], or [NewInterceptor].
 type Option interface {
 	apply(*config)
 }

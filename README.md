@@ -151,11 +151,9 @@ It supports:
 * The two most recent major releases of Go. Keep in mind that [only the last
   two releases receive security patches][go-support-policy].
 * [APIv2] of Protocol Buffers in Go (`google.golang.org/protobuf`).
-* v2 of `connectrpc.com/connect`.
-
-`validate` v0.7.x is the last release series compatible with
-`connectrpc.com/connect` v1. If you're still on connect v1, pin
-`connectrpc.com/validate@v0.7`.
+* v1 and v2 of `connectrpc.com/connect`. With connect v2, use
+  `NewServerInterceptor` and `NewClientInterceptor`. With connect v1, use
+  `NewInterceptor`, which works the same as in v0.7.x and earlier.
 
 Within those parameters, this project follows semantic versioning. Once we tag
 a stable release, we will _not_ make breaking changes without incrementing the

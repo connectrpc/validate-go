@@ -14,3 +14,8 @@ plugins:
   - local: protoc-gen-connect-go
     out: internal/gen
     opt: paths=source_relative
+  # connect-go v1 stubs for testing the v1 Interceptor. The binary is built from
+  # connectrpc.com/connect/cmd/protoc-gen-connect-go; see the Makefile.
+  - local: protoc-gen-connect-go-v1
+    out: internal/gen/connectv1
+    opt: paths=source_relative
