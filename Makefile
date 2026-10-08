@@ -36,7 +36,7 @@ build: generate ## Build all packages
 	go build ./...
 
 .PHONY: generate
-generate: $(BIN)/buf $(BIN)/license-header $(BIN)/protoc-gen-go $(BIN)/protoc-gen-connect-go ## Regenerate code and licenses
+generate: $(BIN)/buf $(BIN)/license-header $(BIN)/protoc-gen-go $(BIN)/protoc-gen-connect-go $(BIN)/protoc-gen-connect-go-v1 ## Regenerate code and licenses
 	rm -rf internal/gen
 	buf generate
 	license-header \
@@ -85,6 +85,11 @@ $(BIN)/protoc-gen-connect-go: Makefile go.mod
 	@mkdir -p $(@D)
 	@# The version of protoc-gen-connect-go is determined by the version in go.mod
 	go install connectrpc.com/connect/v2/cmd/protoc-gen-connect-go
+
+$(BIN)/protoc-gen-connect-go-v1: Makefile go.mod
+	@mkdir -p $(@D)
+	@# The version of protoc-gen-connect-go-v1 is determined by the version in go.mod
+	go build -o $@ connectrpc.com/connect/cmd/protoc-gen-connect-go
 
 $(BIN)/protoc-gen-go: Makefile go.mod
 	@mkdir -p $(@D)
