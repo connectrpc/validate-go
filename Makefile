@@ -47,6 +47,7 @@ generate: $(BIN)/buf $(BIN)/license-header $(BIN)/protoc-gen-go $(BIN)/protoc-ge
 .PHONY: lint
 lint: $(BIN)/golangci-lint $(BIN)/buf ## Lint
 	go vet ./...
+	golangci-lint fmt --diff
 	golangci-lint run
 	buf lint
 	buf format -d --exit-code
@@ -54,6 +55,7 @@ lint: $(BIN)/golangci-lint $(BIN)/buf ## Lint
 .PHONY: lintfix
 lintfix: $(BIN)/golangci-lint $(BIN)/buf ## Automatically fix some lint errors
 	golangci-lint run --fix
+	golangci-lint fmt
 	buf format -w
 
 .PHONY: install
@@ -79,7 +81,7 @@ $(BIN)/license-header: Makefile
 
 $(BIN)/golangci-lint: Makefile
 	@mkdir -p $(@D)
-	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0
 
 $(BIN)/protoc-gen-connect-go: Makefile go.mod
 	@mkdir -p $(@D)
