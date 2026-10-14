@@ -35,7 +35,6 @@ package validate
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"buf.build/go/protovalidate"
 	"connectrpc.com/connect/v2"
@@ -167,7 +166,7 @@ func (c *config) validate(msg any, code connect.Code) error {
 	}
 	protoMsg, ok := msg.(proto.Message)
 	if !ok {
-		return fmt.Errorf("expected proto.Message, got %T", msg)
+		return connect.Errorf(connect.CodeInternal, "expected proto.Message, got %T", msg)
 	}
 	err := c.validator.Validate(protoMsg)
 	if err == nil {

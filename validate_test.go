@@ -336,6 +336,24 @@ func TestWithValidator(t *testing.T) {
 	require.Equal(t, connect.CodeInternal, connect.CodeOf(err))
 }
 
+func TestNonProtoMessage(t *testing.T) {
+	t.Parallel()
+	interceptor := validate.NewServerInterceptor()
+	handler := interceptor(func(_ context.Context, _ connect.Spec, stream connect.ServerStream) error {
+		return stream.Receive(&struct{}{})
+	})
+	err := handler(t.Context(), connect.Spec{}, nopServerStream{})
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInternal, connect.CodeOf(err))
+}
+
+// nopServerStream is a [connect.ServerStream] whose Receive is a no-op.
+type nopServerStream struct {
+	connect.ServerStream
+}
+
+func (nopServerStream) Receive(any) error { return nil }
+
 // failingValidator is a [protovalidate.Validator] that always returns err.
 type failingValidator struct {
 	err error

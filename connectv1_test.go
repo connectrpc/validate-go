@@ -360,6 +360,16 @@ func TestWithValidatorV1(t *testing.T) {
 	require.Equal(t, connect.CodeInternal, connect.CodeOf(err))
 }
 
+func TestNonProtoMessageV1(t *testing.T) {
+	t.Parallel()
+	unary := validate.NewInterceptor().WrapUnary(func(context.Context, connect.AnyRequest) (connect.AnyResponse, error) {
+		return nil, errors.New("next called")
+	})
+	_, err := unary(t.Context(), connect.NewRequest(&struct{}{}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInternal, connect.CodeOf(err))
+}
+
 func startHTTPServerV1(tb testing.TB, h http.Handler) *httptest.Server {
 	tb.Helper()
 	srv := httptest.NewUnstartedServer(h)
