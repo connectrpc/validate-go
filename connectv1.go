@@ -115,12 +115,15 @@ func (i *Interceptor) validate(msg any, code connect.Code) error {
 	if err == nil {
 		return nil
 	}
+	var validationErr *protovalidate.ValidationError
+	if !errors.As(err, &validationErr) {
+		// Compilation and runtime errors come from the rules, not the message.
+		return connect.NewError(connect.CodeInternal, err)
+	}
 	connectErr := connect.NewError(code, err)
 	if !i.config.noErrorDetails {
-		if validationErr := new(protovalidate.ValidationError); errors.As(err, &validationErr) {
-			if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
-				connectErr.AddDetail(detail)
-			}
+		if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
+			connectErr.AddDetail(detail)
 		}
 	}
 	return connectErr

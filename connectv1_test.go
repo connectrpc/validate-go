@@ -43,6 +43,7 @@ func TestInterceptorUnaryV1(t *testing.T) {
 		svc               func(context.Context, *connect.Request[userv1.CreateUserRequest]) (*connect.Response[userv1.CreateUserResponse], error)
 		req               *userv1.CreateUserRequest
 		validateResponses bool
+		validator         protovalidate.Validator
 		wantCode          connect.Code
 		wantPath          string // field path, from error details
 	}{
@@ -79,6 +80,15 @@ func TestInterceptorUnaryV1(t *testing.T) {
 			wantCode:          connect.CodeInternal,
 			wantPath:          "user.email",
 		},
+		{
+			name: "validator_error",
+			svc:  createUserV1,
+			req: &userv1.CreateUserRequest{
+				User: &userv1.User{Email: "someone@example.com"},
+			},
+			validator: failingValidator{err: &protovalidate.RuntimeError{}},
+			wantCode:  connect.CodeInternal,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -87,6 +97,9 @@ func TestInterceptorUnaryV1(t *testing.T) {
 			var opts []validate.Option
 			if test.validateResponses {
 				opts = append(opts, validate.WithValidateResponses())
+			}
+			if test.validator != nil {
+				opts = append(opts, validate.WithValidator(test.validator))
 			}
 			validator := validate.NewInterceptor(opts...)
 
@@ -344,7 +357,7 @@ func TestWithValidatorV1(t *testing.T) {
 	_, err = userv1connect.NewUserServiceClient(srv.Client(), srv.URL).
 		CreateUser(t.Context(), req)
 	require.Error(t, err)
-	require.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+	require.Equal(t, connect.CodeInternal, connect.CodeOf(err))
 }
 
 func startHTTPServerV1(tb testing.TB, h http.Handler) *httptest.Server {
