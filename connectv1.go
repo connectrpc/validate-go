@@ -36,9 +36,10 @@ import (
 // message type once, validation is very efficient. To customize the validator,
 // use [WithValidator] and [protovalidate.ValidatorOption].
 //
-// RPCs with invalid request messages short-circuit with an error. The error
-// always uses [connect.CodeInvalidArgument] and has a [detailed representation
-// of the error] attached as a [connect.ErrorDetail].
+// Invalid request messages short-circuit with [connect.CodeInvalidArgument].
+// Invalid response messages short-circuit with [connect.CodeInternal]. Both
+// errors carry a [detailed representation of the error] as a
+// [connect.ErrorDetail] unless [WithoutErrorDetails] is set.
 //
 // This interceptor is primarily intended for use on handlers. Client-side use
 // is possible, but discouraged unless the client always has an up-to-date
