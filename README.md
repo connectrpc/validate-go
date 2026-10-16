@@ -83,7 +83,7 @@ import (
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
 	"connectrpc.com/validate"
-	"connectrpc.com/validate/internal/gen/example/user/v1/userv1connect"
+	"example.com/gen/example/user/v1/userv1connect"
 )
 
 func main() {
@@ -113,9 +113,12 @@ up-to-date schema, it's better to let the server handle validation.
 
 ### How do clients know which fields are invalid?
 
-If the message fails validation, the interceptor returns an error coded
-with `connect.CodeInvalidArgument`. It also adds a [detailed representation of the
-validation error(s)][violations] as an [error detail][connect-error-detail].
+If a request fails validation, the interceptor returns an error coded with
+`connect.CodeInvalidArgument`. (Invalid responses use `connect.CodeInternal`.)
+It also adds a [detailed representation of the validation error(s)][violations]
+as an [error detail][connect-error-detail]. If the constraints themselves are
+broken, like a CEL expression that doesn't compile, the interceptor returns
+`connect.CodeInternal` without details.
 
 ### How should schemas import protovalidate's options?
 
@@ -125,7 +128,7 @@ constraints must import [`buf/validate/validate.proto`][validate.proto]. It's
 easiest to import this file directly from the [Buf Schema
 Registry][bsr]: this repository contains an [example
 schema](internal/proto/example/user/v1/user.proto) with constraints,
-[buf.yaml](internal/proto/buf.yaml) and [buf.gen.yaml](buf.gen.yaml)
+[buf.yaml](buf.yaml) and [buf.gen.yaml](buf.gen.yaml)
 configuration files, and `make generate` [recipe](Makefile).
 
 ### Does the interceptor validate responses?

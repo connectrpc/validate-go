@@ -35,7 +35,6 @@ package validate
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"buf.build/go/protovalidate"
 	"connectrpc.com/connect/v2"
@@ -167,18 +166,21 @@ func (c *config) validate(msg any, code connect.Code) error {
 	}
 	protoMsg, ok := msg.(proto.Message)
 	if !ok {
-		return fmt.Errorf("expected proto.Message, got %T", msg)
+		return connect.Errorf(connect.CodeInternal, "expected proto.Message, got %T", msg)
 	}
 	err := c.validator.Validate(protoMsg)
 	if err == nil {
 		return nil
 	}
+	var validationErr *protovalidate.ValidationError
+	if !errors.As(err, &validationErr) {
+		// Compilation and runtime errors come from the rules, not the message.
+		return connect.Errorf(connect.CodeInternal, "%s", err.Error()).WithCause(err)
+	}
 	connectErr := connect.Errorf(code, "%s", err.Error()).WithCause(err)
 	if !c.noErrorDetails {
-		if validationErr := new(protovalidate.ValidationError); errors.As(err, &validationErr) {
-			if detail, err := connectproto.NewErrorDetail(validationErr.ToProto()); err == nil {
-				connectErr = connectErr.WithDetail(detail)
-			}
+		if detail, err := connectproto.NewErrorDetail(validationErr.ToProto()); err == nil {
+			connectErr = connectErr.WithDetail(detail)
 		}
 	}
 	return connectErr

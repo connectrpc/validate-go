@@ -36,9 +36,10 @@ import (
 // message type once, validation is very efficient. To customize the validator,
 // use [WithValidator] and [protovalidate.ValidatorOption].
 //
-// RPCs with invalid request messages short-circuit with an error. The error
-// always uses [connect.CodeInvalidArgument] and has a [detailed representation
-// of the error] attached as a [connect.ErrorDetail].
+// Invalid request messages short-circuit with [connect.CodeInvalidArgument].
+// Invalid response messages short-circuit with [connect.CodeInternal]. Both
+// errors carry a [detailed representation of the error] as a
+// [connect.ErrorDetail] unless [WithoutErrorDetails] is set.
 //
 // This interceptor is primarily intended for use on handlers. Client-side use
 // is possible, but discouraged unless the client always has an up-to-date
@@ -109,18 +110,21 @@ func (i *Interceptor) validate(msg any, code connect.Code) error {
 	}
 	protoMsg, ok := msg.(proto.Message)
 	if !ok {
-		return fmt.Errorf("expected proto.Message, got %T", msg)
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("expected proto.Message, got %T", msg))
 	}
 	err := i.config.validator.Validate(protoMsg)
 	if err == nil {
 		return nil
 	}
+	var validationErr *protovalidate.ValidationError
+	if !errors.As(err, &validationErr) {
+		// Compilation and runtime errors come from the rules, not the message.
+		return connect.NewError(connect.CodeInternal, err)
+	}
 	connectErr := connect.NewError(code, err)
 	if !i.config.noErrorDetails {
-		if validationErr := new(protovalidate.ValidationError); errors.As(err, &validationErr) {
-			if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
-				connectErr.AddDetail(detail)
-			}
+		if detail, err := connect.NewErrorDetail(validationErr.ToProto()); err == nil {
+			connectErr.AddDetail(detail)
 		}
 	}
 	return connectErr

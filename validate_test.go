@@ -42,6 +42,7 @@ func TestInterceptorUnary(t *testing.T) {
 		svc               func(context.Context, *userv1.CreateUserRequest) (*userv1.CreateUserResponse, error)
 		req               *userv1.CreateUserRequest
 		validateResponses bool
+		validator         protovalidate.Validator
 		wantCode          connect.Code
 		wantPath          string // field path, from error details
 	}{
@@ -78,6 +79,15 @@ func TestInterceptorUnary(t *testing.T) {
 			wantCode:          connect.CodeInternal,
 			wantPath:          "user.email",
 		},
+		{
+			name: "validator_error",
+			svc:  createUser,
+			req: &userv1.CreateUserRequest{
+				User: &userv1.User{Email: "someone@example.com"},
+			},
+			validator: failingValidator{err: &protovalidate.RuntimeError{}},
+			wantCode:  connect.CodeInternal,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -86,6 +96,9 @@ func TestInterceptorUnary(t *testing.T) {
 			var opts []validate.Option
 			if test.validateResponses {
 				opts = append(opts, validate.WithValidateResponses())
+			}
+			if test.validator != nil {
+				opts = append(opts, validate.WithValidator(test.validator))
 			}
 			validator := validate.NewServerInterceptor(opts...)
 
@@ -320,7 +333,34 @@ func TestWithValidator(t *testing.T) {
 		User: &userv1.User{Email: "someone@example.com"},
 	})
 	require.Error(t, err)
-	require.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
+	require.Equal(t, connect.CodeInternal, connect.CodeOf(err))
+}
+
+func TestNonProtoMessage(t *testing.T) {
+	t.Parallel()
+	interceptor := validate.NewServerInterceptor()
+	handler := interceptor(func(_ context.Context, _ connect.Spec, stream connect.ServerStream) error {
+		return stream.Receive(&struct{}{})
+	})
+	err := handler(t.Context(), connect.Spec{}, nopServerStream{})
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeInternal, connect.CodeOf(err))
+}
+
+// nopServerStream is a [connect.ServerStream] whose Receive is a no-op.
+type nopServerStream struct {
+	connect.ServerStream
+}
+
+func (nopServerStream) Receive(any) error { return nil }
+
+// failingValidator is a [protovalidate.Validator] that always returns err.
+type failingValidator struct {
+	err error
+}
+
+func (v failingValidator) Validate(proto.Message, ...protovalidate.ValidationOption) error {
+	return v.err
 }
 
 // userService implements userv1connect.UserServiceHandler with a swappable
